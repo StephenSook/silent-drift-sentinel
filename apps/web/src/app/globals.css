@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+/*
+  Silent-Drift Sentinel design tokens.
+  Dark-mode-first (this is a production monitoring tool). True cool grey, not
+  pure black, so elevation reads through lightness. OKLCH for perceptual
+  uniformity. One saturated accent (electric blue) plus a small semantic set:
+  amber = degraded/drift, red = incident/changed, green = healthy.
+*/
+
+@theme {
+  --color-bg: oklch(0.155 0.012 264);
+  --color-surface-1: oklch(0.19 0.013 264);
+  --color-surface-2: oklch(0.23 0.014 264);
+  --color-surface-3: oklch(0.275 0.015 264);
+
+  --color-fg: oklch(0.965 0.004 264);
+  --color-muted: oklch(0.72 0.012 264);
+  --color-subtle: oklch(0.56 0.012 264);
+
+  --color-border: oklch(0.4 0.01 264 / 0.28);
+  --color-border-strong: oklch(0.5 0.01 264 / 0.45);
+
+  --color-accent: oklch(0.7 0.16 253);
+  --color-accent-soft: oklch(0.7 0.16 253 / 0.14);
+  --color-degraded: oklch(0.8 0.15 76);
+  --color-degraded-soft: oklch(0.8 0.15 76 / 0.14);
+  --color-danger: oklch(0.66 0.2 22);
+  --color-danger-soft: oklch(0.66 0.2 22 / 0.14);
+  --color-healthy: oklch(0.75 0.15 156);
+  --color-healthy-soft: oklch(0.75 0.15 156 / 0.14);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --radius-card: 14px;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tabular figures everywhere numbers matter: metrics, PSI, URNs. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
