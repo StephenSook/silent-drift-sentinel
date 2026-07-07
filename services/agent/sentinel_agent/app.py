@@ -7,21 +7,23 @@ A demo mode replays a recorded run so the stream is identical every time.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 
-from . import config, demo
+from . import config, datahub_io, demo
 from .graph import build_graph
 from .state import DriftState
 
 app = FastAPI(title="Silent-Drift Sentinel Agent")
+_ORIGINS = os.environ.get("SENTINEL_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=_ORIGINS,
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -41,6 +43,18 @@ def health() -> dict:
 @app.get("/api/signal")
 def signal() -> dict:
     return _load_signal()
+
+
+@app.get("/api/lineage")
+def lineage() -> dict:
+    sig = _load_signal()
+    return datahub_io.lineage_graph(config.MODEL_URN, sig.get("root_cause_feature", ""))
+
+
+@app.get("/api/drift")
+def drift() -> dict:
+    p = _SIGNAL.parent / "drift_chart.json"
+    return json.loads(p.read_text()) if p.exists() else {}
 
 
 async def _live_stream():

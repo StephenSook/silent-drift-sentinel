@@ -63,6 +63,10 @@ datahub/volumes/
 services/agent/.wal/
 .wal/
 
+# ---- Playwright / screenshots ----
+.playwright-mcp/
+/dashboard-*.png
+
 # ---- Misc ----
 .cache/
 tmp/

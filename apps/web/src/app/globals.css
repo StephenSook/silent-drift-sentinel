@@ -30,8 +30,9 @@
   --color-healthy: oklch(0.75 0.15 156);
   --color-healthy-soft: oklch(0.75 0.15 156 / 0.14);
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+  --font-display: var(--font-instrument);
 
   --radius-card: 14px;
 }
