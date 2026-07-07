@@ -15,10 +15,8 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.11"
-      - name: Create venv and install
-        run: |
-          uv venv
-          uv pip install -e "ml[dev]"
+      - name: Install
+        run: uv pip install -e "ml[dev]"
       - name: Lint (ruff)
         run: uv run ruff check ml datahub
       - name: Test (pytest)
