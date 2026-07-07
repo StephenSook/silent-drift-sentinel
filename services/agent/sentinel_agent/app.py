@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import pathlib
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_SIGNAL = pathlib.Path(__file__).resolve().parents[3] / "ml" / "artifacts" / "drift_signal.json"
+_SIGNAL = config.ARTIFACTS_DIR / "drift_signal.json"
 _SSE_HEADERS = {"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
 
 

@@ -6,9 +6,13 @@ import pathlib
 
 from dotenv import load_dotenv
 
-# repo root: services/agent/sentinel_agent/config.py -> parents[3]
-_ROOT = pathlib.Path(__file__).resolve().parents[3]
+# repo root: services/agent/sentinel_agent/config.py -> parents[3]; override with
+# SENTINEL_ROOT when the agent is deployed outside the repo tree.
+_ROOT = pathlib.Path(os.environ.get("SENTINEL_ROOT") or pathlib.Path(__file__).resolve().parents[3])
 load_dotenv(_ROOT / ".env")
+
+# where the ML pipeline's drift_signal.json / drift_chart.json live
+ARTIFACTS_DIR = pathlib.Path(os.environ.get("SENTINEL_ARTIFACTS_DIR") or (_ROOT / "ml" / "artifacts"))
 
 GMS_URL = os.environ.get("DATAHUB_GMS_URL", "http://localhost:8080")
 GMS_TOKEN = os.environ.get("DATAHUB_GMS_TOKEN") or None
