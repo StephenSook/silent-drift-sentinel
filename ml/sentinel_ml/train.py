@@ -15,7 +15,6 @@ import pathlib
 import joblib
 import lightgbm as lgb
 import matplotlib
-import numpy as np
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
