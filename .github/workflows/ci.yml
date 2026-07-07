@@ -18,7 +18,7 @@ jobs:
       - name: Install
         run: uv pip install -e "ml[dev]"
       - name: Lint (ruff)
-        run: uv run ruff check ml datahub
+        run: uv run ruff check ml datahub services
       - name: Test (pytest)
         run: uv run pytest ml/tests -q
 

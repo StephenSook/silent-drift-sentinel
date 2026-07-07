@@ -59,6 +59,10 @@ datahub/volumes/
 *.swp
 *.log
 
+# ---- Agent runtime ----
+services/agent/.wal/
+.wal/
+
 # ---- Misc ----
 .cache/
 tmp/
