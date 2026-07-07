@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python:
+    name: Python (lint + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+      - name: Create venv and install
+        run: |
+          uv venv
+          uv pip install -e "ml[dev]"
+      - name: Lint (ruff)
+        run: uv run ruff check ml datahub
+      - name: Test (pytest)
+        run: uv run pytest ml/tests -q
+
+  web:
+    name: Web (build + typecheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - name: Install
+        run: pnpm -C apps/web install --frozen-lockfile
+      - name: Build (Next.js, includes typecheck)
+        run: pnpm -C apps/web build
