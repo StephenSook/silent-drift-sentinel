@@ -142,6 +142,42 @@ def run() -> dict:
     return metrics
 
 
+def _log_to_mlflow(metrics: dict) -> None:
+    """Log the trained model to a local MLflow registry so DataHub's MLflow
+    connector can ingest it as a real mlModel with real training metrics.
+    Imported lazily so the core module and tests never require mlflow."""
+    import os
+
+    import mlflow
+    import mlflow.sklearn
+
+    calibrated = joblib.load(ARTIFACTS / "model_calibrated.joblib")
+    raw = joblib.load(ARTIFACTS / "model_raw.joblib")
+    mlflow.set_tracking_uri(
+        os.environ.get("MLFLOW_TRACKING_URI", f"sqlite:///{ARTIFACTS.parent / 'mlflow.db'}")
+    )
+    mlflow.set_experiment("silent-drift-sentinel")
+    with mlflow.start_run(run_name="online_shoppers_lgbm"):
+        params = raw.get_params()
+        keep = ["n_estimators", "learning_rate", "num_leaves", "subsample",
+                "colsample_bytree", "reg_lambda", "scale_pos_weight"]
+        mlflow.log_params({k: params[k] for k in keep if k in params})
+        mlflow.log_metric("best_iteration", metrics["best_iteration"])
+        for k, v in metrics["reference"].items():
+            mlflow.log_metric(k.replace(".", "_"), v)
+        mlflow.set_tags({
+            "dataset": "UCI Online Shoppers Purchasing Intention",
+            "task": "purchase_intent", "calibration": "isotonic", "algorithm": "LightGBM",
+        })
+        info = mlflow.sklearn.log_model(calibrated, artifact_path="model")
+        mlflow.register_model(info.model_uri, "online_shoppers_purchase_intent")
+    print("logged + registered to MLflow at", ARTIFACTS.parent / "mlflow.db")
+
+
 if __name__ == "__main__":
+    import sys
+
     m = run()
     print(json.dumps(m, indent=2))
+    if "--mlflow" in sys.argv:
+        _log_to_mlflow(m)
