@@ -44,7 +44,6 @@ print("StructuredProperties fields:", list(StructuredProperties.model_fields.key
 # low-level classes for the feature layer + structured property definition
 from datahub.metadata.schema_classes import (
     MLFeaturePropertiesClass,
-    MLFeatureTablePropertiesClass,
     StructuredPropertyDefinitionClass,
 )
 

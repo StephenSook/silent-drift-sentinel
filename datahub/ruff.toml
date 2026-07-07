@@ -1,0 +1,6 @@
+line-length = 100
+target-version = "py311"
+
+[lint.per-file-ignores]
+# Diagnostic / inspection scripts intentionally set env or import mid-file.
+"scripts/*" = ["E402"]
