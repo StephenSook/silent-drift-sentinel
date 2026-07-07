@@ -31,6 +31,7 @@ ml/data/raw/
 ml/artifacts/*.pkl
 ml/artifacts/*.joblib
 ml/artifacts/*.txt
+ml/artifacts/*.parquet
 mlruns/
 mlartifacts/
 

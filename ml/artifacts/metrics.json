@@ -1,0 +1,50 @@
+{
+  "split_sizes": {
+    "train_fit": 6165,
+    "val": 1233,
+    "calib": 1480,
+    "reference": 1479,
+    "production": 1973
+  },
+  "positive_rate": {
+    "train_fit": 0.1058,
+    "val": 0.1914,
+    "calib": 0.2568,
+    "reference": 0.2549,
+    "production": 0.1333
+  },
+  "reference": {
+    "roc_auc": 0.8082,
+    "pr_auc": 0.6163,
+    "f1_at_0.5": 0.6503,
+    "brier_raw": 0.1431,
+    "brier_calibrated": 0.1327,
+    "ece_raw": 0.0867,
+    "ece_calibrated": 0.0411
+  },
+  "best_iteration": 35,
+  "n_features": 21,
+  "features": [
+    "Administrative",
+    "Administrative_Duration",
+    "Informational",
+    "Informational_Duration",
+    "ProductRelated",
+    "ProductRelated_Duration",
+    "BounceRates",
+    "ExitRates",
+    "PageValues",
+    "SpecialDay",
+    "total_pages",
+    "total_duration",
+    "avg_product_duration",
+    "product_ratio",
+    "Month",
+    "VisitorType",
+    "Weekend",
+    "OperatingSystems",
+    "Browser",
+    "Region",
+    "TrafficType"
+  ]
+}
