@@ -11,6 +11,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import ELK from "elkjs/lib/elk.bundled.js";
+import PulseEdge from "./PulseEdge";
 import type { Lineage, LineageNode } from "./lib";
 
 const elk = new ELK();
@@ -58,6 +59,7 @@ function EntityNode({ data }: { data: LineageNode }) {
 }
 
 const nodeTypes = { entity: EntityNode };
+const edgeTypes = { pulse: PulseEdge };
 
 export default function LineageGraph({
   lineage,
@@ -90,6 +92,31 @@ export default function LineageGraph({
           return { id: c.id, type: "entity", position: { x: c.x ?? 0, y: c.y ?? 0 }, data: n };
         }),
       );
+      // hop distance from the model along the root path, so the backward pulse is
+      // staggered (model -> feature fires first, then feature -> source table)
+      const modelId = lineage.nodes.find((n) => n.kind === "model")?.id;
+      const rootAdj: Record<string, string[]> = {};
+      lineage.edges
+        .filter((e) => e.root)
+        .forEach((e) => {
+          (rootAdj[e.source] ??= []).push(e.target);
+          (rootAdj[e.target] ??= []).push(e.source);
+        });
+      const dist: Record<string, number> = {};
+      if (modelId) {
+        dist[modelId] = 0;
+        const queue = [modelId];
+        while (queue.length) {
+          const cur = queue.shift()!;
+          for (const nb of rootAdj[cur] ?? []) {
+            if (dist[nb] === undefined) {
+              dist[nb] = dist[cur] + 1;
+              queue.push(nb);
+            }
+          }
+        }
+      }
+      const DUR = 1.05;
       setEdges(
         lineage.edges.map((e) => {
           const hot = e.root && revealed;
@@ -98,7 +125,8 @@ export default function LineageGraph({
             id: e.id,
             source: e.source,
             target: e.target,
-            animated: hot,
+            type: "pulse",
+            data: { hot, delay: (dist[e.target] ?? 0) * DUR, dur: DUR },
             style: { stroke: color, strokeWidth: hot ? 2 : 1 },
             markerEnd: { type: MarkerType.ArrowClosed, color },
           };
@@ -115,6 +143,7 @@ export default function LineageGraph({
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       fitView
       fitViewOptions={{ padding: 0.15 }}
       proOptions={{ hideAttribution: true }}
