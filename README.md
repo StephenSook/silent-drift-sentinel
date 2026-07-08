@@ -44,7 +44,7 @@ Everything below runs live against a real hosted DataHub, on real data, with no 
 |---|---|---|
 | Drift detection | **WIRED LIVE** | NannyML CBPE label-free performance estimate + per-feature KS/Chi-squared with Benjamini-Hochberg FDR + PCA reconstruction + data-quality fingerprint |
 | Root-cause lineage traversal | **WIRED LIVE** | Deterministic DataHub aspect reads: model to feature to source table to owner |
-| Agentic root-cause loop | **WIRED LIVE (opt-in)** | Claude drives the Agent Context Kit tools (`get_entities`, `get_lineage`) in a bounded, live-streamed tool-calling loop; falls back to a single synthesis on any error |
+| Agentic root-cause loop | **WIRED LIVE (opt-in)** | Claude drives ACK-style read tools (`get_entities`, `get_lineage`), implemented over the DataHub Python SDK, in a bounded, live-streamed tool-calling loop; falls back to a single synthesis on any error |
 | Metadata-aware code-gen | **WIRED LIVE** | From the change-type taxonomy, generates a dbt test + Great Expectations expectation + SQL guard, written back as a typed property |
 | Write-back (split) | **WIRED LIVE** | `drift_causation` + `proposed_fix` structured properties, `drift-degraded` tag, and RCA on the mlModel; incident on the upstream dataset (incidents cannot target an mlModel) |
 | Close-the-loop recall | **WIRED LIVE** | A re-run reads its own `drift_causation` from the catalog and short-circuits |
@@ -129,7 +129,7 @@ We state the novelty as "no public prior art found," not proof of non-existence.
 ## Tech stack
 
 - **ML:** LightGBM, scikit-learn (isotonic calibration), NannyML (CBPE), SciPy / statsmodels (KS, Chi-squared, Benjamini-Hochberg FDR), pandas.
-- **Agent:** Python, LangGraph, FastAPI, sse-starlette, langchain-anthropic (Claude), LiteLLM (Gemini fallback), the DataHub Agent Context Kit, Langfuse, Postgres checkpointing.
+- **Agent:** Python, LangGraph, FastAPI, sse-starlette, langchain-anthropic (Claude), LiteLLM (Gemini fallback), ACK-style catalog read tools (`get_entities`, `get_lineage`) implemented over the DataHub Python SDK, Langfuse, Postgres checkpointing.
 - **DataHub:** self-hosted DataHub Core (metadata auth on, least-privilege service-account PAT), GraphQL write-back, `raiseIncident`, structured properties.
 - **Web:** Next.js 16, React 19, Tailwind, React Flow, Apache ECharts, Motion, Server-Sent Events.
 - **Mobile:** Expo, React Native, react-native-sse.
@@ -181,7 +181,8 @@ Sample outputs live in `examples/`. Tests: `pytest ml/tests services/agent/tests
 - Root cause is lineage-guided correlation plus data-quality evidence, not proven causation. The app states this on screen.
 - The primary signal is label-free performance estimation (CBPE), valid under covariate shift with calibrated probabilities but not under concept drift; the estimate is reported as directional.
 - The demo dataset is real (UCI Online Shoppers) and the injected failure is a realistic pipeline bug (an upstream job emitting a default value), not synthetic noise. The deterministic demo mode replays a recorded run so the stream is identical every time; the same code path runs live.
-- The Agent Context Kit `get_lineage` tool reads the async graph search index, which returns 0 upstream on a freshly emitted catalog; the load-bearing traversal is the deterministic aspect read, and the agentic loop reasons around the index result.
+- The `get_lineage` read tool reads the async graph search index, which returns 0 upstream on a freshly emitted catalog; the load-bearing traversal is the deterministic aspect read, and the agentic loop reasons around the index result.
+- The agent's read tools follow the DataHub Agent Context Kit pattern (`get_entities`, `get_lineage`, ownership) but are implemented directly over the DataHub Python SDK; the shipped path does not use the `datahub-agent-context` package or the DataHub MCP server.
 
 ## License
 
