@@ -160,16 +160,22 @@ def reset() -> dict:
     return {"reset": writeback.reset_writeback(config.MODEL_URN)}
 
 
-async def _live_stream(thread_id: str, scenario: str):
+async def _live_stream(thread_id: str, scenario: str, agentic: bool = False):
     sig = _load_signal(scenario)
     init = DriftState(
         drift_signal=sig, model_urn=config.MODEL_URN,
         root_cause_feature=sig.get("root_cause_feature", ""),
+        agentic=agentic,
     )
     cfg = {"configurable": {"thread_id": thread_id}, "callbacks": _callbacks()}
     yield {"event": "start", "data": json.dumps({"model_urn": config.MODEL_URN, "mode": "live"})}
-    # runs detect -> traverse -> root_cause -> identify_owner, then interrupts
-    async for chunk in _GRAPH.astream(init, config=cfg, stream_mode="updates"):
+    # runs detect -> traverse -> root_cause -> identify_owner, then interrupts. The
+    # "updates" mode carries each node's trace; "custom" carries the agentic loop's
+    # catalog reads pushed live from inside root_cause, so the UI shows Claude working.
+    async for mode, chunk in _GRAPH.astream(init, config=cfg, stream_mode=["updates", "custom"]):
+        if mode == "custom":
+            yield {"event": "trace", "data": json.dumps(chunk)}
+            continue
         for _node, update in chunk.items():
             if not isinstance(update, dict):  # e.g. the __interrupt__ marker
                 continue
@@ -188,11 +194,11 @@ async def _live_stream(thread_id: str, scenario: str):
 
 
 @app.get("/api/stream")
-async def stream(demo_mode: bool = False, scenario: str = "harmful"):
+async def stream(demo_mode: bool = False, scenario: str = "harmful", agentic: bool = False):
     if demo_mode:
         gen = demo.demo_stream(config.MODEL_URN, scenario)
     else:
-        gen = _live_stream(uuid.uuid4().hex, scenario)
+        gen = _live_stream(uuid.uuid4().hex, scenario, agentic=agentic)
     return EventSourceResponse(gen, headers=_SSE_HEADERS)
 
 

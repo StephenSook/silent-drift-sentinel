@@ -37,6 +37,10 @@ class DriftState(BaseModel):
     # human-in-the-loop
     approved: bool = True
 
+    # per-run opt-in: run the real Claude tool-calling loop in root_cause and stream
+    # each catalog read live (defaults to the SENTINEL_AGENTIC_RCA env otherwise)
+    agentic: bool = False
+
     # streaming trace: list of {node, kind, message, ...}, accumulated
     trace: Annotated[list[dict[str, Any]], operator.add] = Field(default_factory=list)
 

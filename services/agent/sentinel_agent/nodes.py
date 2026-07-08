@@ -94,24 +94,50 @@ def traverse(state: DriftState) -> dict[str, Any]:
     }
 
 
+# the reliable subset of the Agent Context Kit tools to hand the agentic loop (the
+# broader set includes reads that error or add noise against a fresh catalog)
+AGENTIC_TOOLS = ("get_entities", "get_lineage")
+
+
+def _stream_writer():
+    """The langgraph custom-stream writer if we are inside a streaming run, else None.
+    Lets the agentic loop push each catalog read to the UI live instead of batching
+    the whole investigation into one update at the end."""
+    try:
+        from langgraph.config import get_stream_writer
+        return get_stream_writer()
+    except Exception:  # noqa: BLE001 - not in a streaming context (tests, demo, approve)
+        return None
+
+
 def root_cause(state: DriftState) -> dict[str, Any]:
     # Reason over DataHub through the Agent Context Kit. Two modes: a real Claude
-    # tool-calling loop (Claude decides which catalog reads to make), or a single
-    # synthesis over context gathered by fixed code. The agentic loop always falls
-    # back to the synthesis on any error, so the live run can never break.
+    # tool-calling loop (Claude decides which catalog reads to make, streamed live), or
+    # a single synthesis over context gathered by fixed code. The agentic loop always
+    # falls back to the synthesis on any error, so the live run can never break.
+    use_agentic = state.agentic or config.AGENTIC_RCA
     narrative = ""
     ack_log: list[dict[str, str]] = []
-    if config.AGENTIC_RCA:
+    streamed_live = False
+    if use_agentic:
         try:
-            tools = datahub_io.agent_context_tools()
+            writer = _stream_writer()
+            emit = None
+            if writer is not None:
+                emit = writer  # push each tool call to the custom stream as it happens
+                streamed_live = True
+            tools = [t for t in datahub_io.agent_context_tools() if t.name in AGENTIC_TOOLS]
             narrative, ack_log = llm.agentic_rca(
-                state.drift_signal, state.lineage, tools, state.model_urn, state.source_table)
+                state.drift_signal, state.lineage, tools, state.model_urn,
+                state.source_table, emit=emit)
         except Exception:  # noqa: BLE001 - the agentic loop must never break the run
-            narrative = ""
+            narrative, ack_log, streamed_live = "", [], False
     if not narrative:
         _ctx, ack_log = datahub_io.gather_ack_context(state.model_urn, state.source_table)
         narrative = llm.synthesize_rca(state.drift_signal, state.lineage, ack_context=ack_log)
-    trace = [
+        streamed_live = False
+    # when the tool calls streamed live, do not repeat them in the returned trace
+    trace: list[dict[str, Any]] = [] if streamed_live else [
         event("root_cause", "tool_call", f"{e['tool']} (Agent Context Kit): {e['summary']}")
         for e in ack_log
     ]

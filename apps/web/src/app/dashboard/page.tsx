@@ -134,6 +134,8 @@ export default function Dashboard() {
   const [drift, setDrift] = useState<Drift | null>(null);
   const [card, setCard] = useState<ModelCard | null>(null);
   const [evalr, setEvalr] = useState<EvalReport | null>(null);
+  // opt in to the agentic loop: Claude drives the catalog reads live (slower, watchable)
+  const [agentic, setAgentic] = useState(false);
 
   useEffect(() => {
     fetchLineage(scenario).then(setLineage).catch(() => {});
@@ -205,7 +207,17 @@ export default function Dashboard() {
             </button>
           )}
           <button
-            onClick={() => run(false, scenario)}
+            onClick={() => setAgentic((a) => !a)}
+            disabled={busy}
+            title="Agentic mode: Claude drives the DataHub reads itself in a live tool-calling loop (slower, but you watch it investigate). Off uses the fast single synthesis over Agent Context Kit reads."
+            className={`rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-colors disabled:opacity-40 ${
+              agentic ? "border-accent/60 bg-accent-soft text-accent" : "border-border text-subtle hover:text-muted"
+            }`}
+          >
+            Agentic {agentic ? "on" : "off"}
+          </button>
+          <button
+            onClick={() => run(false, scenario, agentic)}
             disabled={busy}
             className="rounded-md border border-accent/40 bg-accent-soft px-3 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/20 disabled:opacity-40"
           >

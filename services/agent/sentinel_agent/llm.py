@@ -110,11 +110,12 @@ def _tool_summary(name: str, out: Any) -> str:
 
 
 def agentic_rca(drift_signal: dict[str, Any], lineage: dict[str, Any], tools: list,
-                model_urn: str, source_table: str) -> tuple[str, list[dict[str, str]]]:
+                model_urn: str, source_table: str, emit=None) -> tuple[str, list[dict[str, str]]]:
     """A real Claude tool-calling loop: Claude decides which Agent Context Kit reads to
     make (entities, lineage, ownership) to confirm the cause, then writes the RCA. This
     is the agent genuinely using the catalog, not reasoning over a fixed context blob.
-    Returns (narrative, tool_call_log). Raises on failure so the caller can fall back."""
+    Returns (narrative, tool_call_log). Raises on failure so the caller can fall back.
+    If `emit` is given, each tool call is pushed to it live (for streaming to the UI)."""
     from langchain_anthropic import ChatAnthropic
     from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 
@@ -148,6 +149,9 @@ def agentic_rca(drift_signal: dict[str, Any], lineage: dict[str, Any], tools: li
                 out = f"error: {type(e).__name__}: {e}"
                 summary = f"error: {type(e).__name__}"
             log.append({"tool": tc["name"], "summary": summary})
+            if emit is not None:
+                emit({"node": "root_cause", "kind": "tool_call",
+                      "message": f"{tc['name']} (Agent Context Kit): {summary}"})
             messages.append(ToolMessage(content=str(out)[:4000], tool_call_id=tc["id"]))
     narrative = _extract(ai.content).strip() if ai is not None else ""
     if not narrative:

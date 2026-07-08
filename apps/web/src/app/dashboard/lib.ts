@@ -136,10 +136,12 @@ export function useAgentRun() {
   const [state, setState] = useState<RunState>({ status: "idle", trace: [] });
   const esRef = useRef<EventSource | null>(null);
 
-  const run = useCallback((demo: boolean, scenario: Scenario = "harmful") => {
+  const run = useCallback((demo: boolean, scenario: Scenario = "harmful", agentic = false) => {
     esRef.current?.close();
     setState({ status: "running", trace: [], demo });
-    const es = new EventSource(`${AGENT_URL}/api/stream?demo_mode=${demo}&scenario=${scenario}`);
+    const es = new EventSource(
+      `${AGENT_URL}/api/stream?demo_mode=${demo}&scenario=${scenario}&agentic=${agentic}`,
+    );
     esRef.current = es;
 
     es.addEventListener("start", (e) => {
