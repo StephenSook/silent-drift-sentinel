@@ -9,6 +9,14 @@ const R = 2.35;
 const BLUE = new THREE.Color("#6f9ef6");
 const AMBER = new THREE.Color("#e6ae5a");
 
+// deterministic pseudo-random in [0,1) keyed on the point index, so the scattered
+// start is stable across renders (pure, unlike Math.random which the render-purity
+// lint rule flags).
+const rnd = (i: number, salt: number): number => {
+  const x = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+};
+
 /**
  * A Fibonacci-sphere constellation of lineage nodes. On load the points fly in
  * from a scattered cloud and assemble onto the sphere (easeOutCubic), the
@@ -33,9 +41,9 @@ function Constellation({ reduced }: { reduced: boolean }) {
       targets[ix] = Math.cos(theta) * r * R;
       targets[ix + 1] = y * R;
       targets[ix + 2] = Math.sin(theta) * r * R;
-      const sr = 7 + Math.random() * 7;
-      const sTheta = Math.random() * Math.PI * 2;
-      const sPhi = Math.acos(2 * Math.random() - 1);
+      const sr = 7 + rnd(i, 1) * 7;
+      const sTheta = rnd(i, 2) * Math.PI * 2;
+      const sPhi = Math.acos(2 * rnd(i, 3) - 1);
       scattered[ix] = sr * Math.sin(sPhi) * Math.cos(sTheta);
       scattered[ix + 1] = sr * Math.sin(sPhi) * Math.sin(sTheta);
       scattered[ix + 2] = sr * Math.cos(sPhi);

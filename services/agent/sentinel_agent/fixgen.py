@@ -147,7 +147,6 @@ def _unit_change(col, model, table, lo, hi):
 
 
 def _distribution_shift(col, model, table, lo, hi):
-    mid = round((lo + hi) / 2, 4)
     dbt = (
         f"# schema.yml (dbt_expectations)\nmodels:\n  - name: {model}\n    columns:\n      - name: {col}\n"
         f"        tests:\n          - dbt_expectations.expect_column_mean_to_be_between:\n"

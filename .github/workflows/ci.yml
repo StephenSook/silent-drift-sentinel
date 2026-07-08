@@ -19,8 +19,12 @@ jobs:
         run: uv pip install -e "ml[dev]"
       - name: Lint (ruff)
         run: uv run ruff check ml datahub services
-      - name: Test (pytest)
+      - name: Test ML (pytest)
         run: uv run pytest ml/tests -q
+      - name: Test agent (pytest)
+        run: |
+          uv pip install acryl-datahub python-dotenv pytest
+          uv run pytest services/agent/tests -q
 
   web:
     name: Web (build + typecheck)
@@ -37,5 +41,7 @@ jobs:
           cache-dependency-path: apps/web/pnpm-lock.yaml
       - name: Install
         run: pnpm -C apps/web install --frozen-lockfile
+      - name: Lint (eslint)
+        run: pnpm -C apps/web lint
       - name: Build (Next.js, includes typecheck)
         run: pnpm -C apps/web build
