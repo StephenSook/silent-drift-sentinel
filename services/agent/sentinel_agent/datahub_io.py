@@ -53,8 +53,10 @@ def traverse_lineage(model_urn: str, drifted_feature: str) -> dict[str, Any]:
     return result
 
 
-def lineage_graph(model_urn: str, drifted_feature: str) -> dict[str, Any]:
-    """Nodes + edges for the UI lineage DAG, with the root-cause path flagged."""
+def lineage_graph(model_urn: str, drifted_feature: str, harmful: bool = True) -> dict[str, Any]:
+    """Nodes + edges for the UI lineage DAG. When harmful, the root-cause path is
+    flagged and the model/table read degraded/changed; a benign shift leaves the
+    model healthy and only marks the feature as drifted (drift is not degradation)."""
     g = _graph()
     mp = g.get_aspect(model_urn, MLModelPropertiesClass)
     model_own = g.get_aspect(model_urn, OwnershipClass)
@@ -68,7 +70,8 @@ def lineage_graph(model_urn: str, drifted_feature: str) -> dict[str, Any]:
             return urn
 
     nodes.append({
-        "id": model_urn, "kind": "model", "label": "purchase_intent", "status": "degraded",
+        "id": model_urn, "kind": "model", "label": "purchase_intent",
+        "status": "degraded" if harmful else "ok",
         "owner": (model_own.owners[0].owner.split(":")[-1] if model_own and model_own.owners else None),
         "metrics": ({m.name: m.value for m in (mp.trainingMetrics or [])} if mp else {}),
     })
@@ -78,7 +81,8 @@ def lineage_graph(model_urn: str, drifted_feature: str) -> dict[str, Any]:
         is_root = bool(drifted_feature and drifted_feature in f)
         nodes.append({"id": f, "kind": "feature", "label": fname,
                       "status": "drifted" if is_root else "ok"})
-        edges.append({"id": f"e-{f}-model", "source": f, "target": model_urn, "root": is_root})
+        edges.append({"id": f"e-{f}-model", "source": f, "target": model_urn,
+                      "root": is_root and harmful})
         fp = g.get_aspect(f, MLFeaturePropertiesClass)
         for src in (fp.sources or []) if fp else []:
             if src not in seen:
@@ -88,7 +92,8 @@ def lineage_graph(model_urn: str, drifted_feature: str) -> dict[str, Any]:
                               "status": "ok",
                               "owner": (src_own.owners[0].owner.split(":")[-1]
                                         if src_own and src_own.owners else None)})
-            edges.append({"id": f"e-{src}-{f}", "source": src, "target": f, "root": is_root})
+            edges.append({"id": f"e-{src}-{f}", "source": src, "target": f,
+                          "root": is_root and harmful})
 
     for n in nodes:
         if n["kind"] == "dataset" and any(e["root"] and e["source"] == n["id"] for e in edges):

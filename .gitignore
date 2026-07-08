@@ -74,3 +74,6 @@ scratch/
 
 # root build guide stays local
 /CLAUDE.md
+
+# hackathon reference (contains third-party PII, never commit)
+/devpost info

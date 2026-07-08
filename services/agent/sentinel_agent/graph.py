@@ -17,7 +17,13 @@ def build_graph(checkpointer=None, interrupt_before_writeback: bool = False):
     g.add_node("write_back", nodes.write_back)
 
     g.add_edge(START, "detect")
-    g.add_edge("detect", "traverse")
+    # Only investigate and write back when the drift is actually harmful. A benign
+    # shift (a unit rescale the model is invariant to) stops right after Detect.
+    g.add_conditional_edges(
+        "detect",
+        lambda s: "traverse" if s.drift_signal.get("harmful") else END,
+        {"traverse": "traverse", END: END},
+    )
     g.add_edge("traverse", "root_cause")
     g.add_edge("root_cause", "identify_owner")
     g.add_edge("identify_owner", "write_back")

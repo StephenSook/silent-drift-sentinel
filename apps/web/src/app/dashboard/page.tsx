@@ -9,6 +9,7 @@ import {
   useAgentRun,
   type Drift,
   type Lineage,
+  type Scenario,
 } from "./lib";
 
 const LineageGraph = dynamic(() => import("./LineageGraph"), { ssr: false });
@@ -46,13 +47,14 @@ function Empty({ label }: { label: string }) {
 
 export default function Dashboard() {
   const { state, run, approve } = useAgentRun();
+  const [scenario, setScenario] = useState<Scenario>("harmful");
   const [lineage, setLineage] = useState<Lineage | null>(null);
   const [drift, setDrift] = useState<Drift | null>(null);
 
   useEffect(() => {
-    fetchLineage().then(setLineage).catch(() => {});
-    fetchDrift().then(setDrift).catch(() => {});
-  }, []);
+    fetchLineage(scenario).then(setLineage).catch(() => {});
+    fetchDrift(scenario).then(setDrift).catch(() => {});
+  }, [scenario]);
 
   const revealed =
     state.trace.some((t) => t.node === "traverse" && t.kind === "tool_result") || !!state.writeback;
@@ -66,13 +68,32 @@ export default function Dashboard() {
       <header className="flex items-center justify-between border-b border-border px-5 py-3">
         <div className="flex items-center gap-3">
           <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-degraded opacity-60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-degraded" />
+            <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${scenario === "harmful" ? "bg-degraded" : "bg-healthy"}`} />
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${scenario === "harmful" ? "bg-degraded" : "bg-healthy"}`} />
           </span>
           <span className="font-mono text-xs tracking-[0.22em] text-muted">SILENT-DRIFT SENTINEL</span>
           <span className="font-mono text-[11px] text-subtle">/ online_shoppers_purchase_intent</span>
         </div>
         <div className="flex items-center gap-2">
+          {/* scenario toggle: proof that drift is not always degradation */}
+          <div className="mr-1 flex overflow-hidden rounded-md border border-border text-[11px] font-medium">
+            <button
+              onClick={() => setScenario("harmful")}
+              disabled={busy}
+              title="Upstream job zeroes out PageValues: the model degrades"
+              className={`px-2.5 py-1.5 transition-colors disabled:opacity-40 ${scenario === "harmful" ? "bg-degraded-soft text-degraded" : "text-subtle hover:text-muted"}`}
+            >
+              Harmful bug
+            </button>
+            <button
+              onClick={() => setScenario("benign")}
+              disabled={busy}
+              title="PageValues rescaled x100: big shift, model unaffected"
+              className={`border-l border-border px-2.5 py-1.5 transition-colors disabled:opacity-40 ${scenario === "benign" ? "bg-healthy-soft text-healthy" : "text-subtle hover:text-muted"}`}
+            >
+              Benign bug
+            </button>
+          </div>
           {awaiting && (
             <button
               onClick={() => state.approval && approve(state.approval.thread_id)}
@@ -82,14 +103,14 @@ export default function Dashboard() {
             </button>
           )}
           <button
-            onClick={() => run(false)}
+            onClick={() => run(false, scenario)}
             disabled={busy}
             className="rounded-md border border-accent/40 bg-accent-soft px-3 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/20 disabled:opacity-40"
           >
             {busy ? (awaiting ? "Awaiting approval" : "Running...") : "Run agent (live)"}
           </button>
           <button
-            onClick={() => run(true)}
+            onClick={() => run(true, scenario)}
             disabled={busy}
             className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-border-strong disabled:opacity-40"
           >
@@ -157,11 +178,12 @@ export default function Dashboard() {
             {drift ? (
               <>
                 <div className="mb-2 flex items-baseline gap-2">
-                  <span className="tnum font-display text-4xl leading-none text-degraded">
+                  <span className={`tnum font-display text-4xl leading-none ${scenario === "harmful" ? "text-degraded" : "text-healthy"}`}>
                     {drift.performance.estimated_current}
                   </span>
                   <span className="tnum text-[11px] text-subtle">
-                    est. ROC-AUC, was {drift.performance.reference} (label-free)
+                    est. ROC-AUC, was {drift.performance.reference}
+                    {scenario === "harmful" ? " (label-free)" : " (unchanged, label-free)"}
                   </span>
                 </div>
                 <div className="h-32">
@@ -231,7 +253,9 @@ export default function Dashboard() {
                   </motion.div>
                 ) : (
                   <div className="mt-3 text-xs text-subtle">
-                    Healthy. No drift-causation recorded yet.
+                    {scenario === "benign"
+                      ? "Healthy. Benign drift evaluated and dismissed. Nothing written to the catalog."
+                      : "Healthy. No drift-causation recorded yet."}
                   </div>
                 )}
               </AnimatePresence>

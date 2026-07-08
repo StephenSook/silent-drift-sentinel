@@ -55,9 +55,18 @@ def _recorded(model_urn: str) -> list[dict[str, Any]]:
     ]
 
 
-async def demo_stream(model_urn: str):
+def _recorded_benign(model_urn: str) -> list[Any]:
+    return [
+        (0.4, "trace", {"node": "detect", "kind": "info", "message": f"Drift signal received for {model_urn}"}),
+        (1.1, "trace", {"node": "detect", "kind": "info", "message": "PageValues shifted hard (a unit rescale, roughly x100), so raw input drift is high. CBPE estimates performance is unchanged (0.808 -> 0.815, label-free): the model is a gradient-boosted tree, invariant to a monotonic rescale."}),
+        (0.8, "trace", {"node": "detect", "kind": "result", "message": "No alarm. No lineage walk, no write-back, nobody paged. Drift is not degradation, and the agent does not cry wolf."}),
+    ]
+
+
+async def demo_stream(model_urn: str, scenario: str = "harmful"):
+    recorded = _recorded_benign(model_urn) if scenario == "benign" else _recorded(model_urn)
     yield {"event": "start", "data": json.dumps({"model_urn": model_urn, "mode": "demo"})}
-    for delay, event, data in _recorded(model_urn):
+    for delay, event, data in recorded:
         await asyncio.sleep(delay)
         yield {"event": event, "data": json.dumps(data)}
     yield {"event": "done", "data": json.dumps({"ok": True})}

@@ -69,6 +69,24 @@ chart = {
 (ARTIFACTS / "drift_chart.json").write_text(json.dumps(chart, indent=2))
 print(f"saved -> {ARTIFACTS / 'drift_chart.json'}")
 
+# Benign-scenario artifacts: the control that shifts hard yet correctly does NOT
+# alarm (a monotonic unit rescale the tree model is invariant to). This is the
+# anti-toy proof the UI shows alongside the harmful case.
+(ARTIFACTS / "drift_signal_benign.json").write_text(json.dumps(benign_signal, indent=2))
+pv_prod_b = benign_prod["PageValues"].to_numpy()
+_hi_b = float(np.percentile(pv_prod_b[pv_prod_b > 0], 95)) if (pv_prod_b > 0).any() else 1.0
+_edges_b = np.linspace(0.0, max(_hi_b, 1.0), 21)
+chart_b = {
+    "feature": "PageValues",
+    "bins": [round(float(e), 1) for e in _edges_b],
+    "reference_hist": [int(x) for x in np.histogram(pv_ref, bins=_edges_b)[0]],
+    "production_hist": [int(x) for x in np.histogram(pv_prod_b, bins=_edges_b)[0]],
+    "performance": benign_signal["performance"],
+    "drifted": benign_signal["drifted_features"],
+}
+(ARTIFACTS / "drift_chart_benign.json").write_text(json.dumps(chart_b, indent=2))
+print(f"saved -> {ARTIFACTS / 'drift_signal_benign.json'} and drift_chart_benign.json")
+
 assert signal["harmful"] is True, "harmful scenario must alarm"
 assert benign_signal["harmful"] is False, "benign control must not alarm"
 assert signal["root_cause_feature"] == "PageValues", "root cause must localize to PageValues"

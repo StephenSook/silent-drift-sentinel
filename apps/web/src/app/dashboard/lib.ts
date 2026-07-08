@@ -36,12 +36,14 @@ export type WriteBack = {
   result: Record<string, { status: string; result?: string }>;
 };
 
-export async function fetchLineage(): Promise<Lineage> {
-  const r = await fetch(`${AGENT_URL}/api/lineage`);
+export type Scenario = "harmful" | "benign";
+
+export async function fetchLineage(scenario: Scenario = "harmful"): Promise<Lineage> {
+  const r = await fetch(`${AGENT_URL}/api/lineage?scenario=${scenario}`);
   return r.json();
 }
-export async function fetchDrift(): Promise<Drift> {
-  const r = await fetch(`${AGENT_URL}/api/drift`);
+export async function fetchDrift(scenario: Scenario = "harmful"): Promise<Drift> {
+  const r = await fetch(`${AGENT_URL}/api/drift?scenario=${scenario}`);
   return r.json();
 }
 
@@ -60,10 +62,10 @@ export function useAgentRun() {
   const [state, setState] = useState<RunState>({ status: "idle", trace: [] });
   const esRef = useRef<EventSource | null>(null);
 
-  const run = useCallback((demo: boolean) => {
+  const run = useCallback((demo: boolean, scenario: Scenario = "harmful") => {
     esRef.current?.close();
     setState({ status: "running", trace: [], demo });
-    const es = new EventSource(`${AGENT_URL}/api/stream?demo_mode=${demo}`);
+    const es = new EventSource(`${AGENT_URL}/api/stream?demo_mode=${demo}&scenario=${scenario}`);
     esRef.current = es;
 
     es.addEventListener("trace", (e) => {

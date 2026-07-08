@@ -28,8 +28,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_SIGNAL = config.ARTIFACTS_DIR / "drift_signal.json"
 _SSE_HEADERS = {"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
+
+
+def _artifact(scenario: str, kind: str):
+    # kind is "signal" or "chart"; the benign scenario reads the _benign variant
+    suffix = "_benign" if scenario == "benign" else ""
+    return config.ARTIFACTS_DIR / f"drift_{kind}{suffix}.json"
 
 # HITL: one interrupt graph plus an in-process checkpointer. GET /api/stream runs
 # the read-only nodes and stops before write_back (no mutation on a GET); the
@@ -38,8 +43,8 @@ _CHECKPOINTER = MemorySaver()
 _GRAPH = build_graph(checkpointer=_CHECKPOINTER, interrupt_before_writeback=True)
 
 
-def _load_signal() -> dict:
-    return json.loads(_SIGNAL.read_text())
+def _load_signal(scenario: str = "harmful") -> dict:
+    return json.loads(_artifact(scenario, "signal").read_text())
 
 
 @app.get("/health")
@@ -48,24 +53,26 @@ def health() -> dict:
 
 
 @app.get("/api/signal")
-def signal() -> dict:
-    return _load_signal()
+def signal(scenario: str = "harmful") -> dict:
+    return _load_signal(scenario)
 
 
 @app.get("/api/lineage")
-def lineage() -> dict:
-    sig = _load_signal()
-    return datahub_io.lineage_graph(config.MODEL_URN, sig.get("root_cause_feature", ""))
+def lineage(scenario: str = "harmful") -> dict:
+    sig = _load_signal(scenario)
+    return datahub_io.lineage_graph(
+        config.MODEL_URN, sig.get("root_cause_feature", ""), harmful=bool(sig.get("harmful")),
+    )
 
 
 @app.get("/api/drift")
-def drift() -> dict:
-    p = _SIGNAL.parent / "drift_chart.json"
+def drift(scenario: str = "harmful") -> dict:
+    p = _artifact(scenario, "chart")
     return json.loads(p.read_text()) if p.exists() else {}
 
 
-async def _live_stream(thread_id: str):
-    sig = _load_signal()
+async def _live_stream(thread_id: str, scenario: str):
+    sig = _load_signal(scenario)
     init = DriftState(
         drift_signal=sig, model_urn=config.MODEL_URN,
         root_cause_feature=sig.get("root_cause_feature", ""),
@@ -90,11 +97,11 @@ async def _live_stream(thread_id: str):
 
 
 @app.get("/api/stream")
-async def stream(demo_mode: bool = False):
+async def stream(demo_mode: bool = False, scenario: str = "harmful"):
     if demo_mode:
-        gen = demo.demo_stream(config.MODEL_URN)
+        gen = demo.demo_stream(config.MODEL_URN, scenario)
     else:
-        gen = _live_stream(uuid.uuid4().hex)
+        gen = _live_stream(uuid.uuid4().hex, scenario)
     return EventSourceResponse(gen, headers=_SSE_HEADERS)
 
 
