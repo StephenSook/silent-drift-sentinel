@@ -153,6 +153,10 @@ def agentic_rca(drift_signal: dict[str, Any], lineage: dict[str, Any], tools: li
                 emit({"node": "root_cause", "kind": "tool_call",
                       "message": f"{tc['name']} (Agent Context Kit): {summary}"})
             messages.append(ToolMessage(content=str(out)[:4000], tool_call_id=tc["id"]))
+        # fill the gap while Claude reasons over the tool results into the final RCA
+        if emit is not None:
+            emit({"node": "root_cause", "kind": "thinking",
+                  "message": "Reading the catalog results and reasoning about the cause"})
     narrative = _extract(ai.content).strip() if ai is not None else ""
     if not narrative:
         # the loop ended on a tool call; force a final prose synthesis with no tools
