@@ -15,8 +15,9 @@ const AMBER = new THREE.Color("#e6ae5a");
  * surface shimmers, and an amber "drift" band sweeps across it (drift is not
  * always degradation, so it passes through). Rotates slowly and parallaxes to
  * the cursor. Additive-blended points for a luminous, no-texture glow.
+ * Reduced-motion users get the assembled sphere, static (frameloop on demand).
  */
-function Constellation() {
+function Constellation({ reduced }: { reduced: boolean }) {
   const ref = useRef<THREE.Points>(null!);
   const started = useRef<number | null>(null);
 
@@ -39,13 +40,15 @@ function Constellation() {
       scattered[ix + 1] = sr * Math.sin(sPhi) * Math.sin(sTheta);
       scattered[ix + 2] = sr * Math.cos(sPhi);
     }
-    const positions = scattered.slice();
+    // reduced-motion: render the assembled sphere from the first frame, no fly-in
+    const positions = (reduced ? targets : scattered).slice();
     const colors = new Float32Array(COUNT * 3);
     for (let i = 0; i < COUNT; i++) BLUE.toArray(colors, i * 3);
     return { targets, scattered, positions, colors };
-  }, []);
+  }, [reduced]);
 
   useFrame((state) => {
+    if (reduced) return; // static assembled sphere; nothing to animate
     const g = ref.current.geometry;
     const pos = g.attributes.position.array as Float32Array;
     const col = g.attributes.color.array as Float32Array;
@@ -90,14 +93,18 @@ function Constellation() {
 }
 
 export default function LineageSphere() {
+  const reduced =
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   return (
     <Canvas
       camera={{ position: [0, 0, 7.2], fov: 45 }}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       dpr={[1, 2]}
+      frameloop={reduced ? "demand" : "always"}
       style={{ position: "absolute", inset: 0 }}
     >
-      <Constellation />
+      <Constellation reduced={reduced} />
     </Canvas>
   );
 }
