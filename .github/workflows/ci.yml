@@ -27,7 +27,7 @@ jobs:
           uv run pytest services/agent/tests -q
 
   web:
-    name: Web (build + typecheck)
+    name: Web (build + lint + e2e)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,3 +45,22 @@ jobs:
         run: pnpm -C apps/web lint
       - name: Build (Next.js, includes typecheck)
         run: pnpm -C apps/web build
+      - name: Install Playwright browser
+        run: pnpm -C apps/web exec playwright install --with-deps chromium
+      - name: E2E hero smoke (hermetic, mocked agent)
+        run: pnpm -C apps/web exec playwright test
+
+  mobile:
+    name: Mobile (typecheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        working-directory: apps/mobile
+        run: npm ci
+      - name: Typecheck (tsc)
+        working-directory: apps/mobile
+        run: npm run typecheck
