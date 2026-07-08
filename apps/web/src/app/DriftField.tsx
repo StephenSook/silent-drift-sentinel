@@ -79,14 +79,14 @@ export default function DriftField() {
       }
 
       // connecting lines
-      const maxD = 150;
+      const maxD = 168;
       for (let a = 0; a < nodes.length; a++) {
         for (let b = a + 1; b < nodes.length; b++) {
           const dx = nodes[a].x - nodes[b].x;
           const dy = nodes[a].y - nodes[b].y;
           const d2 = dx * dx + dy * dy;
           if (d2 > maxD * maxD) continue;
-          const alpha = (1 - Math.sqrt(d2) / maxD) * 0.16;
+          const alpha = (1 - Math.sqrt(d2) / maxD) * 0.3;
           ctx.strokeStyle = `rgba(${ACCENT}, ${alpha})`;
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -100,12 +100,12 @@ export default function DriftField() {
       for (const n of nodes) {
         const degraded = n.x < front;
         const rgb = degraded ? AMBER : ACCENT;
-        const glow = degraded ? 0.9 : 0.5;
+        const glow = degraded ? 0.95 : 0.72;
         ctx.beginPath();
-        ctx.arc(n.x, n.y, degraded ? 2.4 : 1.7, 0, Math.PI * 2);
+        ctx.arc(n.x, n.y, degraded ? 2.9 : 2.2, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${rgb}, ${glow})`;
         ctx.shadowColor = `rgba(${rgb}, ${glow})`;
-        ctx.shadowBlur = degraded ? 12 : 5;
+        ctx.shadowBlur = degraded ? 16 : 9;
         ctx.fill();
       }
       ctx.shadowBlur = 0;
