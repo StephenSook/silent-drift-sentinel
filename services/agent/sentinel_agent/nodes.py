@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from . import datahub_io, fixgen, llm, writeback
+from . import config, datahub_io, fixgen, llm, writeback
 from .state import DriftState, event
 
 
@@ -95,15 +95,28 @@ def traverse(state: DriftState) -> dict[str, Any]:
 
 
 def root_cause(state: DriftState) -> dict[str, Any]:
-    # Read DataHub through the Agent Context Kit tools, then reason over the result.
-    _ctx, ack_log = datahub_io.gather_ack_context(state.model_urn, state.source_table)
+    # Reason over DataHub through the Agent Context Kit. Two modes: a real Claude
+    # tool-calling loop (Claude decides which catalog reads to make), or a single
+    # synthesis over context gathered by fixed code. The agentic loop always falls
+    # back to the synthesis on any error, so the live run can never break.
+    narrative = ""
+    ack_log: list[dict[str, str]] = []
+    if config.AGENTIC_RCA:
+        try:
+            tools = datahub_io.agent_context_tools()
+            narrative, ack_log = llm.agentic_rca(
+                state.drift_signal, state.lineage, tools, state.model_urn, state.source_table)
+        except Exception:  # noqa: BLE001 - the agentic loop must never break the run
+            narrative = ""
+    if not narrative:
+        _ctx, ack_log = datahub_io.gather_ack_context(state.model_urn, state.source_table)
+        narrative = llm.synthesize_rca(state.drift_signal, state.lineage, ack_context=ack_log)
     trace = [
         event("root_cause", "tool_call", f"{e['tool']} (Agent Context Kit): {e['summary']}")
         for e in ack_log
     ]
     trace.append(event("root_cause", "thinking",
                        "Synthesizing root-cause analysis over the catalog context"))
-    narrative = llm.synthesize_rca(state.drift_signal, state.lineage, ack_context=ack_log)
     trace.append(event("root_cause", "result", narrative))
     return {"rca_narrative": narrative, "trace": trace}
 

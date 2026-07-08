@@ -16,6 +16,18 @@ RCA_SYSTEM = (
     "Plain builder voice, no marketing language, no em-dashes. 4 to 7 sentences."
 )
 
+AGENTIC_SYSTEM = (
+    "You are an on-call ML reliability agent. A production model is silently degrading. "
+    "You have read-only DataHub tools (the Agent Context Kit): entity metadata, lineage, "
+    "and ownership. Investigate the catalog with these tools to confirm the upstream "
+    "source of the drift before you conclude, then write the root-cause analysis. When "
+    "you have enough evidence, stop calling tools and write the final RCA as prose: the "
+    "label-free performance impact (CBPE), the drifted feature, the upstream table and "
+    "the change type, the owner to notify, and a concrete fix. Do not overstate: this is "
+    "lineage-guided correlation, not proof. Plain builder voice, no marketing language, "
+    "no em-dashes, 4 to 7 sentences."
+)
+
 
 def _sanitize(text: str) -> str:
     # honor the project em-dash ban even if the model slips
@@ -82,3 +94,66 @@ def synthesize_rca(drift_signal: dict[str, Any], lineage: dict[str, Any],
             return _sanitize((resp.choices[0].message.content or "").strip())
         except Exception:  # noqa: BLE001 - both providers down: deterministic floor keeps the run alive
             return _fallback_rca(drift_signal, lineage)
+
+
+def _tool_summary(name: str, out: Any) -> str:
+    """A short, honest phrase describing what an Agent Context Kit tool call returned,
+    for the streamed trace."""
+    if isinstance(out, dict):
+        ups = out.get("upstreams")
+        if isinstance(ups, dict) and ups.get("total") is not None:
+            return f"walked lineage ({ups['total']} upstream assets)"
+        keys = ", ".join(list(out.keys())[:3])
+        return f"read {keys}" if keys else "read entity"
+    text = str(out)
+    return f"read {text[:60]}" if text else "read entity"
+
+
+def agentic_rca(drift_signal: dict[str, Any], lineage: dict[str, Any], tools: list,
+                model_urn: str, source_table: str) -> tuple[str, list[dict[str, str]]]:
+    """A real Claude tool-calling loop: Claude decides which Agent Context Kit reads to
+    make (entities, lineage, ownership) to confirm the cause, then writes the RCA. This
+    is the agent genuinely using the catalog, not reasoning over a fixed context blob.
+    Returns (narrative, tool_call_log). Raises on failure so the caller can fall back."""
+    from langchain_anthropic import ChatAnthropic
+    from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+
+    base = ChatAnthropic(
+        model=config.ANTHROPIC_MODEL, api_key=config.ANTHROPIC_API_KEY, max_tokens=900,
+        timeout=config.LLM_TIMEOUT, max_retries=1,
+    )
+    llm = base.bind_tools(tools)
+    tools_by_name = {t.name: t for t in tools}
+    human = (
+        f"Model: {model_urn}\nUpstream table under suspicion: {source_table}\n\n"
+        f"Drift signal:\n{json.dumps(drift_signal, indent=2)}\n\n"
+        f"Lineage the agent already walked:\n{json.dumps(lineage, indent=2)}\n\n"
+        "Investigate with the tools to confirm the upstream cause, then write the RCA."
+    )
+    messages: list = [SystemMessage(content=AGENTIC_SYSTEM), HumanMessage(content=human)]
+    log: list[dict[str, str]] = []
+    ai = None
+    for _ in range(max(1, config.AGENTIC_MAX_STEPS)):
+        ai = llm.invoke(messages)
+        messages.append(ai)
+        calls = getattr(ai, "tool_calls", None) or []
+        if not calls:
+            break
+        for tc in calls:
+            tool = tools_by_name.get(tc["name"])
+            try:
+                out = tool.invoke(tc["args"]) if tool is not None else f"unknown tool {tc['name']}"
+                summary = _tool_summary(tc["name"], out)
+            except Exception as e:  # noqa: BLE001 - a tool error is fed back, not fatal
+                out = f"error: {type(e).__name__}: {e}"
+                summary = f"error: {type(e).__name__}"
+            log.append({"tool": tc["name"], "summary": summary})
+            messages.append(ToolMessage(content=str(out)[:4000], tool_call_id=tc["id"]))
+    narrative = _extract(ai.content).strip() if ai is not None else ""
+    if not narrative:
+        # the loop ended on a tool call; force a final prose synthesis with no tools
+        messages.append(HumanMessage(content="Write the final RCA now, prose only, no tool calls."))
+        narrative = _extract(base.invoke(messages).content).strip()
+    if not narrative:
+        raise RuntimeError("agentic RCA produced no narrative")
+    return _sanitize(narrative), log

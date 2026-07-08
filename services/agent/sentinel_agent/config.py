@@ -48,6 +48,16 @@ if not os.environ.get("LANGFUSE_HOST") and os.environ.get("LANGFUSE_BASE_URL"):
     os.environ["LANGFUSE_HOST"] = os.environ["LANGFUSE_BASE_URL"]
 LANGFUSE_ENABLED = bool(os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY"))
 
+# When true, root_cause runs a real Claude tool-calling loop over the Agent Context
+# Kit tools: Claude itself decides which lineage/entity reads to make to confirm the
+# cause, rather than reasoning over context gathered by fixed code. Falls back to the
+# single synthesis on any error, so the live run never breaks. Off by default; turned
+# on via the env on the deployed agent once verified.
+AGENTIC_RCA = os.environ.get("SENTINEL_AGENTIC_RCA", "").lower() in ("1", "true", "yes")
+
+# Bound on the agentic tool-calling loop (how many reason/act rounds Claude gets).
+AGENTIC_MAX_STEPS = int(os.environ.get("SENTINEL_AGENTIC_MAX_STEPS", "4"))
+
 # LLM request timeout (seconds) so a hung provider can't stall the SSE stream.
 LLM_TIMEOUT = int(os.environ.get("SENTINEL_LLM_TIMEOUT", "45"))
 
