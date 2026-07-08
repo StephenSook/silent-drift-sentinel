@@ -77,3 +77,6 @@ scratch/
 
 # hackathon reference (contains third-party PII, never commit)
 /devpost info
+
+# submission drafts (kept local)
+/_submission/
