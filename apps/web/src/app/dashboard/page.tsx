@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -84,6 +84,12 @@ export default function Dashboard() {
     fetchModelCard().then(setCard).catch(() => {});
   }, []);
 
+  // the reasoning panel follows the stream
+  const traceRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    traceRef.current?.scrollTo({ top: traceRef.current.scrollHeight, behavior: "smooth" });
+  }, [state.trace.length]);
+
   const revealed =
     state.trace.some((t) => t.node === "traverse" && t.kind === "tool_result") || !!state.writeback;
   const wb = state.writeback;
@@ -153,7 +159,7 @@ export default function Dashboard() {
           <div className="border-b border-border px-4 py-2 font-mono text-[10px] tracking-widest text-subtle">
             AGENT REASONING
           </div>
-          <div className="flex-1 space-y-2 overflow-y-auto p-3">
+          <div ref={traceRef} className="flex-1 space-y-2 overflow-y-auto p-3">
             {state.trace.length === 0 && (
               <div className="text-xs leading-relaxed text-subtle">
                 Run the agent to watch it detect the drift, walk DataHub lineage to the upstream
