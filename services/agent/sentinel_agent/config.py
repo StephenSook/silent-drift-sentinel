@@ -33,5 +33,9 @@ MODEL_URN = os.environ.get(
     "urn:li:mlModel:(urn:li:dataPlatform:mlflow,online_shoppers_purchase_intent,PROD)",
 )
 
+# Optional Slack Incoming Webhook: the agent posts the finding to the owning team
+# on write-back, closing the loop to a human. No-op if unset.
+SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
+
 # where the write-ahead log lives (gitignored)
 WAL_DIR = pathlib.Path(__file__).resolve().parents[1] / ".wal"

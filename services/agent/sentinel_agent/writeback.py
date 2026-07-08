@@ -143,8 +143,35 @@ def write_back(model_urn: str, causation: dict[str, Any], rca_narrative: str,
         out = _graphql(q)
         return out.get("data", {}).get("raiseIncident", out)
 
+    def _slack() -> str:
+        if not config.SLACK_WEBHOOK_URL:
+            return "not configured"
+        model_name = model_urn.split(",")[1] if "," in model_urn else model_urn
+        table_name = table_urn.split(",")[1] if "," in table_urn else table_urn
+        owner = (causation.get("table_owner") or "").split(":")[-1]
+        text = (
+            ":rotating_light: *Silent-Drift Sentinel* flagged a drift-degraded model\n"
+            f"*Model:* `{model_name}`\n"
+            f"*Cause:* `{causation.get('drifted_feature')}` "
+            f"({causation.get('change_type')}) in `{table_name}`\n"
+            f"*Impact:* {causation.get('drift_metric')}\n"
+            f"*Owner to notify:* {owner}\n"
+            "Recorded on the model (drift_causation property, drift-degraded tag, RCA doc). "
+            "Incident raised on the upstream table."
+        )
+        body = json.dumps({"text": text}).encode()
+        req = urllib.request.Request(
+            config.SLACK_WEBHOOK_URL, data=body, headers={"Content-Type": "application/json"}
+        )
+        try:
+            urllib.request.urlopen(req, timeout=10).read()
+            return "notified"
+        except Exception as e:  # noqa: BLE001 - a notification failure must not fail the write-back
+            return f"error: {type(e).__name__}"
+
     results["structured_property"] = step("structured_property", _prop)
     results["tag"] = step("tag", _tag)
     results["document"] = step("document", _doc)
     results["incident"] = step("incident", _incident)
+    results["slack"] = {"status": "done", "result": _slack()}
     return results

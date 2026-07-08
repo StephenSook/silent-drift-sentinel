@@ -271,11 +271,11 @@ export default function Dashboard() {
                       className="rounded-md border border-accent/30 bg-accent-soft/40 p-2"
                     >
                       <div className="font-mono text-[9px] tracking-widest text-accent">
-                        RCA DOCUMENT + INCIDENT
+                        RCA DOC + INCIDENT + SLACK
                       </div>
                       <div className="mt-1 text-[11px] leading-relaxed text-muted">
-                        Root-cause analysis attached to the model. A FRESHNESS incident was raised on
-                        the upstream web_sessions table and routed to its owner.
+                        Root-cause analysis attached to the model. An incident was raised on the
+                        upstream web_sessions table, and the owning team was notified in Slack.
                       </div>
                     </motion.div>
                   </motion.div>

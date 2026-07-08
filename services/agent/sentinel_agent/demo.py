@@ -49,9 +49,9 @@ def _recorded(model_urn: str) -> list[dict[str, Any]]:
                 "table_owner": "urn:li:corpGroup:data-engineering",
                 "detected_at": "2026-07-07T22:23:47+00:00",
             },
-            "result": {k: {"status": "done"} for k in ("structured_property", "tag", "document", "incident")},
+            "result": {k: {"status": "done"} for k in ("structured_property", "tag", "document", "incident", "slack")},
         }),
-        (0.4, "trace", {"node": "write_back", "kind": "tool_result", "message": "Wrote: structured_property=done, tag=done, document=done, incident=done"}),
+        (0.4, "trace", {"node": "write_back", "kind": "tool_result", "message": "Wrote: structured_property=done, tag=done, document=done, incident=done. Notified data-engineering in Slack."}),
     ]
 
 
