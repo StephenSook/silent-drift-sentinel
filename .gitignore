@@ -71,3 +71,6 @@ services/agent/.wal/
 .cache/
 tmp/
 scratch/
+
+# root build guide stays local
+/CLAUDE.md
