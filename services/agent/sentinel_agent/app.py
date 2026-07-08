@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,7 +20,42 @@ from . import config, datahub_io, demo
 from .graph import build_graph
 from .state import DriftState
 
-app = FastAPI(title="Silent-Drift Sentinel Agent")
+# HITL: a durable Postgres checkpointer with an in-process fallback, plus the
+# interrupt graph, built at startup. GET /api/stream runs the read-only nodes and
+# stops before write_back; POST /api/approve resumes the same thread to write.
+_GRAPH = None
+_pool = None
+
+
+@asynccontextmanager
+async def _lifespan(_app):
+    global _GRAPH, _pool
+    checkpointer = MemorySaver()
+    mode = "memory (in-process)"
+    if config.DATABASE_URL:
+        try:
+            from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+            from psycopg.rows import dict_row
+            from psycopg_pool import AsyncConnectionPool
+            _pool = AsyncConnectionPool(
+                conninfo=config.DATABASE_URL, max_size=5, open=False,
+                kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+            )
+            await _pool.open()
+            saver = AsyncPostgresSaver(_pool)
+            await saver.setup()
+            checkpointer = saver
+            mode = "postgres (durable)"
+        except Exception as e:  # noqa: BLE001 - checkpoint storage must never block startup
+            print(f"[checkpointer] postgres unavailable ({type(e).__name__}); falling back to memory")
+    _GRAPH = build_graph(checkpointer=checkpointer, interrupt_before_writeback=True)
+    print(f"[checkpointer] {mode}")
+    yield
+    if _pool is not None:
+        await _pool.close()
+
+
+app = FastAPI(title="Silent-Drift Sentinel Agent", lifespan=_lifespan)
 _ORIGINS = os.environ.get("SENTINEL_ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 app.add_middleware(
     CORSMiddleware,
@@ -35,12 +71,6 @@ def _artifact(scenario: str, kind: str):
     # kind is "signal" or "chart"; the benign scenario reads the _benign variant
     suffix = "_benign" if scenario == "benign" else ""
     return config.ARTIFACTS_DIR / f"drift_{kind}{suffix}.json"
-
-# HITL: one interrupt graph plus an in-process checkpointer. GET /api/stream runs
-# the read-only nodes and stops before write_back (no mutation on a GET); the
-# explicit POST /api/approve resumes the same thread to execute the write.
-_CHECKPOINTER = MemorySaver()
-_GRAPH = build_graph(checkpointer=_CHECKPOINTER, interrupt_before_writeback=True)
 
 
 def _load_signal(scenario: str = "harmful") -> dict:
@@ -93,7 +123,7 @@ async def _live_stream(thread_id: str, scenario: str):
             for ev in (update.get("trace") or []):
                 yield {"event": "trace", "data": json.dumps(ev)}
     # paused before write_back: ask the human to approve the mutation
-    snap = _GRAPH.get_state(cfg)
+    snap = await _GRAPH.aget_state(cfg)
     if snap.next and "write_back" in snap.next:
         yield {"event": "awaiting_approval", "data": json.dumps(
             {"thread_id": thread_id, "causation": snap.values.get("causation", {})}, default=str,
@@ -116,7 +146,7 @@ async def approve(thread_id: str) -> dict:
     """Resume the interrupted graph to execute the write-back. This is the only
     path that mutates the catalog, and it is an explicit POST, not a GET."""
     cfg = {"configurable": {"thread_id": thread_id}}
-    snap = _GRAPH.get_state(cfg)
+    snap = await _GRAPH.aget_state(cfg)
     if not snap.next or "write_back" not in snap.next:
         return {"error": "no pending write-back for this thread"}
     trace: list = []

@@ -37,5 +37,9 @@ MODEL_URN = os.environ.get(
 # on write-back, closing the loop to a human. No-op if unset.
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
 
+# Optional Postgres for durable HITL checkpointing (the approval gate survives an
+# agent restart). Falls back to an in-process store if unset or unreachable.
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
 # where the write-ahead log lives (gitignored)
 WAL_DIR = pathlib.Path(__file__).resolve().parents[1] / ".wal"
