@@ -30,6 +30,27 @@ def _extract(content: Any) -> str:
     return " ".join(b.get("text", "") for b in content if isinstance(b, dict))
 
 
+def _fallback_rca(drift_signal: dict[str, Any], lineage: dict[str, Any]) -> str:
+    """Deterministic RCA floor: if BOTH LLM providers fail, the live run still emits
+    a sensible narrative instead of crashing the SSE stream mid-demo."""
+    feat = drift_signal.get("root_cause_feature") or drift_signal.get("drifted_feature") or "the drifted feature"
+    metric = drift_signal.get("drift_metric") or drift_signal.get("estimated_metric") or "an estimated performance drop"
+    change = drift_signal.get("change_type", "an upstream data change")
+    table = next(
+        (n.get("label") for n in lineage.get("nodes", [])
+         if n.get("kind") == "dataset" and n.get("status") == "changed"),
+        "the upstream source table",
+    )
+    return _sanitize(
+        f"The model's label-free performance estimate (CBPE) shows {metric}. The Sentinel "
+        f"traced this to {change} on the feature {feat}, sourced from {table}. This is "
+        f"lineage-guided correlation, not proof: the drift in {feat} coincides with the "
+        f"model degradation along the exact upstream path. Recommended fix: add a "
+        f"data-quality guard on {feat} in {table} (a not-null / range assertion), correct "
+        f"the affected rows, then re-validate the model."
+    )
+
+
 def synthesize_rca(drift_signal: dict[str, Any], lineage: dict[str, Any],
                    ack_context: list[dict[str, str]] | None = None) -> str:
     human = (
@@ -44,15 +65,19 @@ def synthesize_rca(drift_signal: dict[str, Any], lineage: dict[str, Any],
     try:
         llm = ChatAnthropic(
             model=config.ANTHROPIC_MODEL, api_key=config.ANTHROPIC_API_KEY, max_tokens=700,
+            timeout=config.LLM_TIMEOUT, max_retries=1,
         )
         msg = llm.invoke([("system", RCA_SYSTEM), ("human", human)])
         return _sanitize(_extract(msg.content).strip())
-    except Exception:  # noqa: BLE001 - provider failover so a live run survives an outage
-        import litellm
-        resp = litellm.completion(
-            model=config.FALLBACK_MODEL,
-            messages=[{"role": "system", "content": RCA_SYSTEM},
-                      {"role": "user", "content": human}],
-            max_tokens=700,
-        )
-        return _sanitize((resp.choices[0].message.content or "").strip())
+    except Exception:  # noqa: BLE001 - primary provider failed; try the cross-provider fallback
+        try:
+            import litellm
+            resp = litellm.completion(
+                model=config.FALLBACK_MODEL,
+                messages=[{"role": "system", "content": RCA_SYSTEM},
+                          {"role": "user", "content": human}],
+                max_tokens=700, timeout=config.LLM_TIMEOUT,
+            )
+            return _sanitize((resp.choices[0].message.content or "").strip())
+        except Exception:  # noqa: BLE001 - both providers down: deterministic floor keeps the run alive
+            return _fallback_rca(drift_signal, lineage)

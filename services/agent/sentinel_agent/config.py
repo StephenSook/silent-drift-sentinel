@@ -41,5 +41,12 @@ SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL")
 # agent restart). Falls back to an in-process store if unset or unreachable.
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+# Optional Langfuse tracing of the LangGraph run; the SDK reads LANGFUSE_PUBLIC_KEY
+# / LANGFUSE_SECRET_KEY / LANGFUSE_HOST from the env. No-op if the keys are absent.
+LANGFUSE_ENABLED = bool(os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY"))
+
+# LLM request timeout (seconds) so a hung provider can't stall the SSE stream.
+LLM_TIMEOUT = int(os.environ.get("SENTINEL_LLM_TIMEOUT", "45"))
+
 # where the write-ahead log lives (gitignored)
 WAL_DIR = pathlib.Path(__file__).resolve().parents[1] / ".wal"

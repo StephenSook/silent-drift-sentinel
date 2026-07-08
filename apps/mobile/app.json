@@ -21,6 +21,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2353286b-3e06-4882-a819-cbd1c8c765e7"
+      }
+    },
+    "owner": "stephensook"
   }
 }

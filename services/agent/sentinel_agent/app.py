@@ -16,9 +16,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.memory import MemorySaver
 from sse_starlette.sse import EventSourceResponse
 
-from . import config, datahub_io, demo
+from . import config, datahub_io, demo, writeback
 from .graph import build_graph
 from .state import DriftState
+
+
+def _callbacks() -> list:
+    """Langfuse tracing callback for the LangGraph run, if configured. LangGraph
+    propagates it through every node, turning the run into a real judge-viewable
+    trace. No-op (empty list) when Langfuse keys are absent or the SDK is missing."""
+    if not config.LANGFUSE_ENABLED:
+        return []
+    try:
+        try:
+            from langfuse.langchain import CallbackHandler  # langfuse v3
+        except ImportError:
+            from langfuse.callback import CallbackHandler  # langfuse v2
+        return [CallbackHandler()]
+    except Exception as e:  # noqa: BLE001 - tracing must never break the agent
+        print(f"[langfuse] disabled ({type(e).__name__})")
+        return []
 
 # HITL: a durable Postgres checkpointer with an in-process fallback, plus the
 # interrupt graph, built at startup. GET /api/stream runs the read-only nodes and
@@ -107,13 +124,28 @@ def model_card() -> dict:
     return json.loads(p.read_text()) if p.exists() else {}
 
 
+@app.get("/api/verify")
+def verify() -> dict:
+    """Live proof: re-fetch the drift_causation property back FROM DataHub so the UI
+    shows it as confirmed by the catalog, not just claimed by the agent."""
+    found = writeback.read_causation(config.MODEL_URN)
+    return {"present": found is not None, "causation": found}
+
+
+@app.post("/api/reset")
+def reset() -> dict:
+    """Clear the write-back (property + tag + incident + WAL) so the live demo
+    re-runs cleanly from a pristine model for the next judge."""
+    return {"reset": writeback.reset_writeback(config.MODEL_URN)}
+
+
 async def _live_stream(thread_id: str, scenario: str):
     sig = _load_signal(scenario)
     init = DriftState(
         drift_signal=sig, model_urn=config.MODEL_URN,
         root_cause_feature=sig.get("root_cause_feature", ""),
     )
-    cfg = {"configurable": {"thread_id": thread_id}}
+    cfg = {"configurable": {"thread_id": thread_id}, "callbacks": _callbacks()}
     yield {"event": "start", "data": json.dumps({"model_urn": config.MODEL_URN, "mode": "live"})}
     # runs detect -> traverse -> root_cause -> identify_owner, then interrupts
     async for chunk in _GRAPH.astream(init, config=cfg, stream_mode="updates"):
@@ -145,7 +177,7 @@ async def stream(demo_mode: bool = False, scenario: str = "harmful"):
 async def approve(thread_id: str) -> dict:
     """Resume the interrupted graph to execute the write-back. This is the only
     path that mutates the catalog, and it is an explicit POST, not a GET."""
-    cfg = {"configurable": {"thread_id": thread_id}}
+    cfg = {"configurable": {"thread_id": thread_id}, "callbacks": _callbacks()}
     snap = await _GRAPH.aget_state(cfg)
     if not snap.next or "write_back" not in snap.next:
         return {"error": "no pending write-back for this thread"}
