@@ -1,0 +1,38 @@
+{
+  "model_urn": "urn:li:mlModel:(urn:li:dataPlatform:mlflow,online_shoppers_purchase_intent,PROD)",
+  "harmful": true,
+  "performance": {
+    "metric": "roc_auc",
+    "reference": 0.808,
+    "estimated_current": 0.7251,
+    "estimated_drop": 0.0829,
+    "label_free": true
+  },
+  "root_cause_feature": "PageValues",
+  "change_type": "default_value_regression",
+  "drifted_features": [
+    {
+      "feature": "PageValues",
+      "test": "KS",
+      "statistic": 0.8343,
+      "p_adj_bh": 0.0,
+      "wasserstein": 15.3203
+    }
+  ],
+  "data_quality": {
+    "feature": "PageValues",
+    "null_rate_ref": 0.0,
+    "null_rate_ana": 0.0,
+    "range_ref": [
+      0.0,
+      270.78
+    ],
+    "range_ana": [
+      0.0,
+      62.84
+    ],
+    "cardinality_ref": 353,
+    "cardinality_ana": 22,
+    "top_value_share_ana": 0.9513
+  }
+}

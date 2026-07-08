@@ -6,9 +6,24 @@ export const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL ?? "http://localhost:
 export const DATAHUB_URL =
   process.env.NEXT_PUBLIC_DATAHUB_URL ?? "https://datahub.16-59-185-192.nip.io";
 
-/** Deep-link to the real DataHub entity page for a URN. */
+// DataHub v1.5 routes entity pages by type; the old /entity/<urn> path returns the
+// app's own 404. An mlModel lives at /mlModels/<urn>, a dataset at /dataset/<urn>,
+// and so on. The urn is used raw in the path (the browser encodes it on navigation).
+const DATAHUB_ENTITY_PATH: Record<string, string> = {
+  mlModel: "mlModels",
+  mlModelGroup: "mlModelGroup",
+  mlFeature: "mlFeatures",
+  mlFeatureTable: "mlFeatureTables",
+  dataset: "dataset",
+  corpuser: "user",
+  corpGroup: "group",
+};
+
+/** Deep-link to the real DataHub entity page for a URN, routed by entity type. */
 export function datahubEntityUrl(urn: string): string {
-  return `${DATAHUB_URL}/entity/${encodeURIComponent(urn)}`;
+  const type = urn.match(/^urn:li:(\w+):/)?.[1] ?? "";
+  const path = DATAHUB_ENTITY_PATH[type];
+  return path ? `${DATAHUB_URL}/${path}/${urn}` : `${DATAHUB_URL}/search?query=${encodeURIComponent(urn)}`;
 }
 
 export type TraceEvent = { node: string; kind: string; message: string };
@@ -56,7 +71,7 @@ export type ProposedFix = {
   needs: string[];
 };
 
-export type Scenario = "harmful" | "benign";
+export type Scenario = "harmful" | "benign" | "default";
 
 export async function fetchLineage(scenario: Scenario = "harmful"): Promise<Lineage> {
   const r = await fetch(`${AGENT_URL}/api/lineage?scenario=${scenario}`);

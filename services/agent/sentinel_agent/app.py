@@ -97,8 +97,9 @@ _SSE_HEADERS = {"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
 
 
 def _artifact(scenario: str, kind: str):
-    # kind is "signal" or "chart"; the benign scenario reads the _benign variant
-    suffix = "_benign" if scenario == "benign" else ""
+    # kind is "signal" or "chart"; each non-harmful scenario reads its own variant
+    # (harmful -> "", benign -> "_benign", default -> "_default").
+    suffix = "" if scenario == "harmful" else f"_{scenario}"
     return config.ARTIFACTS_DIR / f"drift_{kind}{suffix}.json"
 
 

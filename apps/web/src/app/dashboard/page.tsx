@@ -172,8 +172,8 @@ export default function Dashboard() {
       <header className="flex flex-col items-start gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="flex items-center gap-3">
           <span className="relative flex h-2 w-2">
-            <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${scenario === "harmful" ? "bg-degraded" : "bg-healthy"}`} />
-            <span className={`relative inline-flex h-2 w-2 rounded-full ${scenario === "harmful" ? "bg-degraded" : "bg-healthy"}`} />
+            <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${scenario !== "benign" ? "bg-degraded" : "bg-healthy"}`} />
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${scenario !== "benign" ? "bg-degraded" : "bg-healthy"}`} />
           </span>
           <span className="font-mono text-xs tracking-[0.22em] text-muted">SILENT-DRIFT SENTINEL</span>
           <span className="font-mono text-[11px] text-subtle">/ online_shoppers_purchase_intent</span>
@@ -188,6 +188,14 @@ export default function Dashboard() {
               className={`px-2.5 py-1.5 transition-colors disabled:opacity-40 ${scenario === "harmful" ? "bg-degraded-soft text-degraded" : "text-subtle hover:text-muted"}`}
             >
               Harmful bug
+            </button>
+            <button
+              onClick={() => setScenario("default")}
+              disabled={busy}
+              title="Upstream default fill pins ~95% of PageValues to one value: the model degrades, a different bug class"
+              className={`border-l border-border px-2.5 py-1.5 transition-colors disabled:opacity-40 ${scenario === "default" ? "bg-degraded-soft text-degraded" : "text-subtle hover:text-muted"}`}
+            >
+              Default-value bug
             </button>
             <button
               onClick={() => setScenario("benign")}
@@ -318,12 +326,12 @@ export default function Dashboard() {
             {drift ? (
               <>
                 <div className="mb-2 flex items-baseline gap-2">
-                  <span className={`tnum font-display text-4xl leading-none ${scenario === "harmful" ? "text-degraded" : "text-healthy"}`}>
+                  <span className={`tnum font-display text-4xl leading-none ${scenario !== "benign" ? "text-degraded" : "text-healthy"}`}>
                     {drift.performance.estimated_current}
                   </span>
                   <span className="tnum text-[11px] text-subtle">
                     est. ROC-AUC, was {drift.performance.reference}
-                    {scenario === "harmful" ? " (label-free)" : " (unchanged, label-free)"}
+                    {scenario !== "benign" ? " (label-free)" : " (unchanged, label-free)"}
                   </span>
                 </div>
                 <div className="h-32">

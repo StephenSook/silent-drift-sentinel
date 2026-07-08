@@ -31,6 +31,31 @@ _RCA = (
     "PageValues population in the web_sessions pipeline and backfill the affected window."
 )
 
+# A second harmful scenario, a DIFFERENT bug class: an upstream default fill pins
+# ~95% of PageValues rows to one dominant value (a default_value_regression, not a
+# full null collapse). Same lineage walk and write-back, but the agent classifies a
+# different change_type and generates a not_constant guardrail instead of not_null.
+_CAUSATION_DEFAULT = {
+    "drifted_feature": "PageValues", "root_cause_urn": _TABLE,
+    "change_type": "default_value_regression",
+    "drift_metric": "roc_auc 0.808->0.7251 (label-free CBPE), drop 0.0829",
+    "model_owner": "urn:li:corpuser:jane.doe",
+    "table_owner": "urn:li:corpGroup:data-engineering",
+    "detected_at": "2026-07-07T22:23:47+00:00",
+}
+
+_FIX_DEFAULT = fixgen.generate_fix(_CAUSATION_DEFAULT, {"reference": {"min": 0, "max": 361}})
+
+_RCA_DEFAULT = (
+    "CBPE-estimated ROC AUC for online_shoppers_purchase_intent dropped from 0.808 to 0.725 "
+    "(-0.083), label-free since ground truth is not yet available for the current window. "
+    "The drift scan attributes this to PageValues, where an upstream default fill now pins "
+    "about 95% of rows in the web_sessions table to a single dominant value (a default-value "
+    "regression, distinct from a full null collapse), flattening the model's strongest signal. "
+    "This is lineage-guided correlation, not proof. Recommended fix: restore the real "
+    "PageValues population in the web_sessions pipeline and backfill the affected window."
+)
+
 
 def _recorded(model_urn: str) -> list[dict[str, Any]]:
     return [
@@ -51,6 +76,31 @@ def _recorded(model_urn: str) -> list[dict[str, Any]]:
         (1.0, "writeback", {
             "causation": _CAUSATION,
             "proposed_fix": _FIX,
+            "result": {k: {"status": "done"} for k in ("structured_property", "tag", "document", "proposed_fix", "incident", "slack")},
+        }),
+        (0.4, "trace", {"node": "write_back", "kind": "tool_result", "message": "Wrote: structured_property=done, tag=done, document=done, proposed_fix=done, incident=done. Notified data-engineering in Slack."}),
+    ]
+
+
+def _recorded_default(model_urn: str) -> list[dict[str, Any]]:
+    return [
+        (0.4, "trace", {"node": "detect", "kind": "info", "message": f"Drift signal received for {model_urn}"}),
+        (0.7, "trace", {"node": "detect", "kind": "alarm", "message": "Harmful drift: roc_auc 0.808 -> 0.7251 (label-free CBPE), drop 0.0829"}),
+        (0.6, "trace", {"node": "traverse", "kind": "tool_call", "message": "Walking DataHub lineage: model -> features -> source table -> owner"}),
+        (0.9, "trace", {"node": "traverse", "kind": "tool_result", "message": f"Reached upstream table {_TABLE} via feature PageValues; table owner urn:li:corpGroup:data-engineering"}),
+        (0.5, "trace", {"node": "root_cause", "kind": "tool_call", "message": "get_entities (Agent Context Kit): fetched model metadata + owner"}),
+        (0.5, "trace", {"node": "root_cause", "kind": "tool_call", "message": "get_lineage (Agent Context Kit): walked upstream lineage (11 upstream assets)"}),
+        (0.5, "trace", {"node": "root_cause", "kind": "tool_call", "message": "get_entities (Agent Context Kit): fetched upstream table schema + owner"}),
+        (0.4, "trace", {"node": "root_cause", "kind": "thinking", "message": "Synthesizing root-cause analysis over the catalog context"}),
+        (1.4, "trace", {"node": "root_cause", "kind": "result", "message": _RCA_DEFAULT}),
+        (0.5, "trace", {"node": "identify_owner", "kind": "result", "message": "Owner to notify: urn:li:corpGroup:data-engineering"}),
+        (0.6, "trace", {"node": "propose_fix", "kind": "tool_call", "message": f"Generating a data-quality guardrail for {_FIX_DEFAULT['column']} in {_FIX_DEFAULT['table']} ({_FIX_DEFAULT['change_type']})"}),
+        (0.9, "trace", {"node": "propose_fix", "kind": "result", "message": f"Proposed fix: {_FIX_DEFAULT['summary']}", "fix": _FIX_DEFAULT}),
+        (0.7, "awaiting_approval", {"thread_id": "demo", "causation": _CAUSATION_DEFAULT, "proposed_fix": _FIX_DEFAULT}),
+        (1.2, "trace", {"node": "write_back", "kind": "tool_call", "message": "Writing drift_causation + proposed_fix properties, the drift-degraded tag, and the RCA onto the model, plus an incident on the upstream table"}),
+        (1.0, "writeback", {
+            "causation": _CAUSATION_DEFAULT,
+            "proposed_fix": _FIX_DEFAULT,
             "result": {k: {"status": "done"} for k in ("structured_property", "tag", "document", "proposed_fix", "incident", "slack")},
         }),
         (0.4, "trace", {"node": "write_back", "kind": "tool_result", "message": "Wrote: structured_property=done, tag=done, document=done, proposed_fix=done, incident=done. Notified data-engineering in Slack."}),
@@ -85,6 +135,8 @@ async def demo_stream(model_urn: str, scenario: str = "harmful"):
         recorded = _recorded_benign(model_urn)
     elif scenario == "recall":
         recorded = _recorded_recall(model_urn)
+    elif scenario == "default":
+        recorded = _recorded_default(model_urn)
     else:
         recorded = _recorded(model_urn)
     yield {"event": "start", "data": json.dumps({"model_urn": model_urn, "mode": "demo"})}
