@@ -2,10 +2,13 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { motion } from "motion/react";
-import DriftField from "./DriftField";
 import SmoothScroll from "./SmoothScroll";
 import CinematicScroll from "./CinematicScroll";
+
+// WebGL hero is client-only
+const LineageSphere = dynamic(() => import("./LineageSphere"), { ssr: false });
 
 const REPO = "https://github.com/StephenSook/silent-drift-sentinel";
 
@@ -50,7 +53,7 @@ export default function Home() {
       {/* ---- hero ---- */}
       <section data-hero className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 py-24">
         <div data-hero-field className="absolute inset-0">
-          <DriftField />
+          <LineageSphere />
         </div>
         <div
           aria-hidden
