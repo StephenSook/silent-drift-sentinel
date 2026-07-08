@@ -1,0 +1,80 @@
+{
+  "n_scenarios": 5,
+  "alarm": {
+    "tp": 2,
+    "fp": 0,
+    "tn": 3,
+    "fn": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "accuracy": 1.0
+  },
+  "localization_accuracy": 1.0,
+  "localization_n": 3,
+  "change_type_accuracy": 1.0,
+  "change_type_n": 3,
+  "scenarios": [
+    {
+      "name": "clean (no change)",
+      "expected_harmful": false,
+      "actual_harmful": false,
+      "alarm_ok": true,
+      "expected_feature": null,
+      "actual_feature": null,
+      "localization_ok": null,
+      "expected_change_type": null,
+      "actual_change_type": "none",
+      "change_type_ok": null
+    },
+    {
+      "name": "null/default regression (PageValues -> 0)",
+      "expected_harmful": true,
+      "actual_harmful": true,
+      "alarm_ok": true,
+      "expected_feature": "PageValues",
+      "actual_feature": "PageValues",
+      "localization_ok": true,
+      "expected_change_type": "null_default_regression",
+      "actual_change_type": "null_default_regression",
+      "change_type_ok": true
+    },
+    {
+      "name": "unit change (PageValues x100)",
+      "expected_harmful": false,
+      "actual_harmful": false,
+      "alarm_ok": true,
+      "expected_feature": "PageValues",
+      "actual_feature": "PageValues",
+      "localization_ok": true,
+      "expected_change_type": "unit_change",
+      "actual_change_type": "unit_change",
+      "change_type_ok": true
+    },
+    {
+      "name": "default-value regression (PageValues 95% stuck)",
+      "expected_harmful": true,
+      "actual_harmful": true,
+      "alarm_ok": true,
+      "expected_feature": "PageValues",
+      "actual_feature": "PageValues",
+      "localization_ok": true,
+      "expected_change_type": "default_value_regression",
+      "actual_change_type": "default_value_regression",
+      "change_type_ok": true
+    },
+    {
+      "name": "benign shift (SpecialDay, unimportant)",
+      "expected_harmful": false,
+      "actual_harmful": false,
+      "alarm_ok": true,
+      "expected_feature": "SpecialDay",
+      "actual_feature": null,
+      "localization_ok": null,
+      "expected_change_type": null,
+      "actual_change_type": "none",
+      "change_type_ok": null
+    }
+  ],
+  "model_urn": "urn:li:mlModel:(urn:li:dataPlatform:mlflow,online_shoppers_purchase_intent,PROD)",
+  "reference_auc": 0.808
+}

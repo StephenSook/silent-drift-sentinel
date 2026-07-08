@@ -1,0 +1,7 @@
+{
+  "raisedOn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,ecommerce.web_sessions,PROD)",
+  "note": "Incidents cannot be raised on mlModel entities, only on datasets/dataJobs/etc, so the model gets the structured property + tag + RCA and the upstream dataset gets the incident.",
+  "type": "OPERATIONAL",
+  "title": "Silent drift: null_default_regression on PageValues",
+  "description": "Traced from degraded model urn:li:mlModel:(urn:li:dataPlatform:mlflow,online_shoppers_purchase_intent,PROD). roc_auc 0.808->0.7131 (label-free CBPE), drop 0.0949. Root cause in ecommerce.web_sessions. Owner: urn:li:corpGroup:data-engineering."
+}
