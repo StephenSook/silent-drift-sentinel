@@ -495,10 +495,11 @@ export default function Dashboard() {
                     <Metric label="LOCALIZE" value={evalr.localization_accuracy} />
                   </div>
                   <div className="border-t border-border pt-2 text-[10px] leading-relaxed text-subtle">
-                    Over {evalr.n_scenarios} labeled scenarios (null/default, unit rescale, default
-                    value, benign shift): no false alarms and no misses (fp {evalr.alarm.fp}, fn{" "}
-                    {evalr.alarm.fn}), root cause localized {evalr.localization_n}/{evalr.localization_n},
-                    change type classified{" "}
+                    Over {evalr.n_scenarios} labeled scenarios (clean, null/default, unit rescale,
+                    default value, benign shift): no false alarms and no misses (fp {evalr.alarm.fp}, fn{" "}
+                    {evalr.alarm.fn}), root cause localized{" "}
+                    {Math.round((evalr.localization_accuracy ?? 0) * (evalr.localization_n ?? 0))}/
+                    {evalr.localization_n}, change type classified{" "}
                     {evalr.change_type_accuracy != null ? Math.round(evalr.change_type_accuracy * 100) : "-"}%
                     correct. Measured, not asserted.
                   </div>

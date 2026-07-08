@@ -34,9 +34,6 @@ class DriftState(BaseModel):
     causation: dict[str, Any] = Field(default_factory=dict)
     writeback_result: dict[str, Any] = Field(default_factory=dict)
 
-    # human-in-the-loop
-    approved: bool = True
-
     # per-run opt-in: run the real Claude tool-calling loop in root_cause and stream
     # each catalog read live (defaults to the SENTINEL_AGENTIC_RCA env otherwise)
     agentic: bool = False

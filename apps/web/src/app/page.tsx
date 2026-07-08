@@ -227,7 +227,7 @@ export default function Home() {
               <div className="mt-2 rounded-md border border-accent/30 bg-accent-soft/40 p-3">
                 <div className="font-mono text-[9px] tracking-widest text-accent">RCA DOCUMENT + INCIDENT</div>
                 <p className="mt-1.5 text-[11px] leading-5 text-muted">
-                  Root-cause analysis attached to the model. A FRESHNESS incident raised on the
+                  Root-cause analysis attached to the model. An OPERATIONAL incident raised on the
                   upstream web_sessions table.
                 </p>
               </div>

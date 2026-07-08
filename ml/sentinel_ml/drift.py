@@ -77,16 +77,24 @@ def inject_null_regression(df: pd.DataFrame, col: str = "PageValues", value: flo
     return out
 
 
-def least_important_numeric(raw_model) -> str:
+def least_important_numeric(raw_model, ref: pd.DataFrame | None = None) -> str:
     imp = dict(zip(D.feature_columns(), raw_model.feature_importances_))
     numeric_imp = {f: imp[f] for f in NUMERIC}
+    if ref is not None:
+        # exclude zero-variance features: shifting a constant column produces no real
+        # distribution shift, which would make a benign-shift control a vacuous no-op.
+        with_var = {f: v for f, v in numeric_imp.items() if float(ref[f].std()) > 1e-9}
+        numeric_imp = with_var or numeric_imp
     return min(numeric_imp, key=numeric_imp.get)
 
 
 def inject_benign(df: pd.DataFrame, col: str, shift_std: float = 1.5) -> pd.DataFrame:
     """A visible but harmless distribution shift on an unimportant feature."""
     out = df.copy()
-    out[col] = out[col] + shift_std * float(np.std(out[col]))
+    std = float(np.std(out[col]))
+    # a real shift even if the column happens to be near-constant, so the control is
+    # never a silent no-op
+    out[col] = out[col] + (shift_std * std if std > 1e-9 else 1.0)
     return out
 
 

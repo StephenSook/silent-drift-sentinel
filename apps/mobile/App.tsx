@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   LogBox,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -77,14 +78,20 @@ export default function App() {
 
   const approve = useCallback(async () => {
     if (!finding) return;
+    const threadId = finding.thread_id;
     setStatus("running");
-    const r = await fetch(`${AGENT_URL}/api/approve?thread_id=${finding.thread_id}`, {
-      method: "POST",
-    });
-    const data = (await r.json()) as { trace?: Trace[]; writeback?: { result: WriteResult } };
-    setTrace((t) => [...t, ...(data.trace ?? [])]);
-    setResult(data.writeback?.result ?? null);
-    setStatus("done");
+    try {
+      const r = await fetch(`${AGENT_URL}/api/approve?thread_id=${threadId}`, { method: "POST" });
+      if (!r.ok) throw new Error(`approve ${r.status}`);
+      const data = (await r.json()) as { trace?: Trace[]; writeback?: { result: WriteResult } };
+      setTrace((t) => [...t, ...(data.trace ?? [])]);
+      setResult(data.writeback?.result ?? null);
+      setStatus("done");
+    } catch {
+      // a network or backend failure must not hang the app on "Running..."; drop back
+      // to the approval gate so the user can retry
+      setStatus("awaiting");
+    }
   }, [finding]);
 
   const busy = status === "running";
@@ -176,7 +183,8 @@ function Row({ k, v }: { k: string; v?: string }) {
   );
 }
 
-const mono = "Courier";
+// "Courier" is iOS-only and silently falls back to a proportional sans on Android
+const mono = Platform.select({ ios: "Menlo", default: "monospace" });
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
   header: { paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border },

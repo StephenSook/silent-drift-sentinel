@@ -24,7 +24,7 @@ def load() -> pd.DataFrame:
         return df
     except Exception as exc:  # noqa: BLE001
         print(f"ucimlrepo failed ({exc!r}); falling back to direct CSV/zip download", file=sys.stderr)
-        return pd.read_csv(UCI_ZIP.replace(".zip", ".csv")) if False else pd.read_csv(UCI_ZIP, compression="zip")
+        return pd.read_csv(UCI_ZIP, compression="zip")
 
 
 def main() -> None:

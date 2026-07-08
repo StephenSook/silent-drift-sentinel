@@ -205,18 +205,27 @@ export function useAgentRun() {
   }, []);
 
   const approve = useCallback(async (threadId: string) => {
-    setState((s) => ({ ...s, status: "running", approval: undefined }));
-    const r = await fetch(`${AGENT_URL}/api/approve?thread_id=${threadId}`, { method: "POST" });
-    const data = (await r.json()) as { trace?: TraceEvent[]; writeback?: WriteBack };
-    setState((s) => ({
-      ...s,
-      trace: [...s.trace, ...(data.trace ?? [])],
-      writeback: data.writeback ?? s.writeback,
-      status: "done",
-    }));
-    // re-fetch the property FROM DataHub as independent proof it landed
-    const proof = await verifyCatalog().catch(() => undefined);
-    if (proof) setState((s) => ({ ...s, verified: proof }));
+    // keep `approval` set during the POST so a failure can drop back to the gate
+    setState((s) => ({ ...s, status: "running" }));
+    try {
+      const r = await fetch(`${AGENT_URL}/api/approve?thread_id=${threadId}`, { method: "POST" });
+      if (!r.ok) throw new Error(`approve ${r.status}`);
+      const data = (await r.json()) as { trace?: TraceEvent[]; writeback?: WriteBack };
+      setState((s) => ({
+        ...s,
+        approval: undefined,
+        trace: [...s.trace, ...(data.trace ?? [])],
+        writeback: data.writeback ?? s.writeback,
+        status: "done",
+      }));
+      // re-fetch the property FROM DataHub as independent proof it landed
+      const proof = await verifyCatalog().catch(() => undefined);
+      if (proof) setState((s) => ({ ...s, verified: proof }));
+    } catch {
+      // a failed approval must not hang the UI on "Running..."; return to the gate so
+      // the human can retry (the approval is still in state)
+      setState((s) => ({ ...s, status: "awaiting" }));
+    }
   }, []);
 
   // reset run state (used on scenario toggle and the Reset-demo button); when
@@ -226,6 +235,10 @@ export function useAgentRun() {
     setState({ status: "idle", trace: [] });
     if (clearCatalog) resetDemo().catch(() => {});
   }, []);
+
+  // close any open SSE stream when the dashboard unmounts, so an in-flight run does
+  // not leak the connection or setState on an unmounted component
+  useEffect(() => () => esRef.current?.close(), []);
 
   // when a run recalled a recorded cause, re-fetch the property FROM DataHub so the
   // model-page panel can show the exact value the agent read back (proof, not claim)

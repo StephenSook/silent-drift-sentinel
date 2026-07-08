@@ -6,7 +6,7 @@ The flow: open the app, tap **Run diagnosis**, watch the agent detect the drift 
 
 ## Tech
 
-- Expo managed workflow (SDK 54), TypeScript.
+- Expo managed workflow (SDK 57), TypeScript.
 - `react-native-sse` consumes the agent's SSE stream (`/api/stream`, named `trace` and `awaiting_approval` events). Native fetch bypasses CORS, so no backend change is needed.
 - Plain `fetch` for the approve POST (`/api/approve`).
 

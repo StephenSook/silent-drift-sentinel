@@ -1,4 +1,4 @@
-"""The five graph nodes. Only root_cause calls the LLM (prose synthesis);
+"""The seven graph nodes. Only root_cause calls the LLM (prose synthesis);
 everything else is deterministic."""
 from __future__ import annotations
 

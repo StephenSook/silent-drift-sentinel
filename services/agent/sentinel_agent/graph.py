@@ -1,5 +1,8 @@
-"""The five-node LangGraph state machine. Optionally interrupts before the
-write-back for human approval (the mutation gate)."""
+"""The seven-node LangGraph state machine (detect, recall, traverse, root_cause,
+identify_owner, propose_fix, write_back). Detect routes to a recall branch when the
+agent finds a cause it already recorded on the model, short-circuiting re-diagnosis;
+otherwise it walks the lineage through to the write-back. Optionally interrupts before
+the write-back for human approval (the mutation gate)."""
 from __future__ import annotations
 
 from langgraph.graph import END, START, StateGraph

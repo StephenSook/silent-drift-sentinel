@@ -170,7 +170,8 @@ async def _live_stream(thread_id: str, scenario: str, agentic: bool = False):
     )
     cfg = {"configurable": {"thread_id": thread_id}, "callbacks": _callbacks()}
     yield {"event": "start", "data": json.dumps({"model_urn": config.MODEL_URN, "mode": "live"})}
-    # runs detect -> traverse -> root_cause -> identify_owner, then interrupts. The
+    # runs detect -> traverse -> root_cause -> identify_owner -> propose_fix, then
+    # interrupts (or recall -> end when the cause is already on record). The
     # "updates" mode carries each node's trace; "custom" carries the agentic loop's
     # catalog reads pushed live from inside root_cause, so the UI shows Claude working.
     async for mode, chunk in _GRAPH.astream(init, config=cfg, stream_mode=["updates", "custom"]):

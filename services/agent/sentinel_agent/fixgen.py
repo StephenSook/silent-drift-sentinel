@@ -13,7 +13,8 @@ from __future__ import annotations
 from typing import Any
 
 # the change_type taxonomy (from ml/sentinel_ml/drift.py classify_change_type) maps
-# 1:1 to a guardrail. Each entry is (summary, dbt, great_expectations, sql, needs).
+# 1:1 to a guardrail. _CHANGE_TYPES is the set of recognized change-type strings; each
+# per-type builder below returns a tuple in the order (dbt, ge, sql, needs, note).
 _CHANGE_TYPES = {
     "null_default_regression",
     "null_regression",

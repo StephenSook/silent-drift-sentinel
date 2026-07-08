@@ -25,7 +25,7 @@ ARTIFACTS = pathlib.Path(__file__).resolve().parents[1] / "artifacts"
 
 def main() -> dict:
     model, raw, ref = DR.load()
-    least = DR.least_important_numeric(raw)
+    least = DR.least_important_numeric(raw, ref)  # non-constant, so the benign shift is real
 
     # Each scenario: how to build the production window from the reference, plus the
     # ground truth. expected_feature None means nothing was corrupted (a true negative

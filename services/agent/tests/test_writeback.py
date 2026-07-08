@@ -75,3 +75,15 @@ def test_wal_makes_rerun_idempotent(monkeypatch, tmp_path):
     n1 = len(calls)
     writeback.write_back(MODEL, CAUSATION, "rca", TABLE)  # re-run against the same WAL
     assert len(calls) == n1  # every step skipped from the WAL; no new catalog writes
+
+
+def test_wal_rewrites_when_the_diagnosis_changes(monkeypatch, tmp_path):
+    # the scenario-switch fix: a DIFFERENT cause must not reuse the prior run's WAL and
+    # silently skip the catalog writes (which would leave the old cause on the model).
+    calls = _mock(monkeypatch, tmp_path)
+    writeback.write_back(MODEL, CAUSATION, "rca", TABLE)  # null_default_regression
+    n1 = len(calls)
+    other = {**CAUSATION, "change_type": "default_value_regression"}
+    writeback.write_back(MODEL, other, "rca", TABLE)  # a structurally different cause
+    assert len(calls) > n1  # the stale WAL is cleared, so the new cause is written
+    assert any("default_value_regression" in q for q in calls)

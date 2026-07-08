@@ -10,7 +10,7 @@
     "accuracy": 1.0
   },
   "localization_accuracy": 1.0,
-  "localization_n": 3,
+  "localization_n": 4,
   "change_type_accuracy": 1.0,
   "change_type_n": 3,
   "scenarios": [
@@ -63,15 +63,15 @@
       "change_type_ok": true
     },
     {
-      "name": "benign shift (SpecialDay, unimportant)",
+      "name": "benign shift (Informational, unimportant)",
       "expected_harmful": false,
       "actual_harmful": false,
       "alarm_ok": true,
-      "expected_feature": "SpecialDay",
-      "actual_feature": null,
-      "localization_ok": null,
+      "expected_feature": "Informational",
+      "actual_feature": "Informational",
+      "localization_ok": true,
       "expected_change_type": null,
-      "actual_change_type": "none",
+      "actual_change_type": "distribution_shift",
       "change_type_ok": null
     }
   ],

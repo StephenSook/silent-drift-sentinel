@@ -1,6 +1,6 @@
 """The deterministic split write-back, executed by code (never the LLM):
-  ON the model: a drift_causation structured property + a drift-degraded tag + a
-    linked RCA document.
+  ON the model: a drift_causation structured property, a proposed_fix structured
+    property, a drift-degraded tag, and the RCA narrative onto the model description.
   ON the upstream dataset: a real incident (GraphQL raiseIncident).
 A write-ahead log makes the whole thing idempotent: a re-run skips completed
 writes, so a partial failure retries cleanly.
@@ -127,9 +127,11 @@ def reset_writeback(model_urn: str, table_urn: str = "") -> dict[str, Any]:
     # remove via GraphQL: the empty-aspect emit is rejected by the entity authz, but
     # these mutations go through the same edit path the write used.
     try:
+        # clear BOTH typed properties (drift_causation and proposed_fix) so the model
+        # page is genuinely pristine after a reset, not just the causation.
         _graphql('mutation { removeStructuredProperties(input: { assetUrn: "%s", '
-                 'structuredPropertyUrns: ["%s"] }) { properties { structuredProperty { urn } } } }'
-                 % (model_urn, SP_URN))
+                 'structuredPropertyUrns: ["%s", "%s"] }) { properties { structuredProperty { urn } } } }'
+                 % (model_urn, SP_URN, FIX_SP_URN))
         out["structured_property"] = "cleared"
     except Exception as e:  # noqa: BLE001
         out["structured_property"] = f"error: {type(e).__name__}"
@@ -140,6 +142,14 @@ def reset_writeback(model_urn: str, table_urn: str = "") -> dict[str, Any]:
         out["tag"] = "cleared"
     except Exception as e:  # noqa: BLE001
         out["tag"] = f"error: {type(e).__name__}"
+
+    try:
+        # clear the RCA that was written onto the model description
+        _graphql('mutation { updateDescription(input: { description: "", resourceUrn: "%s" }) }'
+                 % model_urn)
+        out["description"] = "cleared"
+    except Exception as e:  # noqa: BLE001
+        out["description"] = f"error: {type(e).__name__}"
 
     incident_urn = (wal.get("steps", {}).get("incident", {}) or {}).get("result")
     if isinstance(incident_urn, str) and incident_urn.startswith("urn:li:incident"):
@@ -165,6 +175,19 @@ def write_back(model_urn: str, causation: dict[str, Any], rca_narrative: str,
                table_urn: str, proposed_fix: dict[str, Any] | None = None) -> dict[str, Any]:
     key = _slug(model_urn)
     wal = _load_wal(key)
+    # A different diagnosis must not reuse a prior run's completed steps. Otherwise
+    # switching scenario and re-running live would find every step "done" and skip all
+    # catalog writes, leaving the model showing the old cause while the UI reports the
+    # new one. When the change_type differs, resolve the old incident and start fresh.
+    if wal.get("steps") and wal.get("causation", {}).get("change_type") != causation.get("change_type"):
+        old_incident = (wal["steps"].get("incident", {}) or {}).get("result")
+        if isinstance(old_incident, str) and old_incident.startswith("urn:li:incident"):
+            try:
+                _graphql('mutation { updateIncidentStatus(urn: "%s", input: { state: RESOLVED }) }'
+                         % old_incident)
+            except Exception:  # noqa: BLE001 - a stale incident resolve must not block the new write
+                pass
+        wal = {"steps": {}}
     wal["causation"] = causation
     wal["model_urn"] = model_urn
     _save_wal(key, wal)
@@ -228,12 +251,16 @@ def write_back(model_urn: str, causation: dict[str, Any], rca_narrative: str,
 
     def _incident():
         table_name = table_urn.split(",")[1] if "," in table_urn else table_urn
+        title = f'Silent drift: {causation["change_type"]} on {causation["drifted_feature"]}'
+        desc = (f"Traced from degraded model {model_urn}. {causation['drift_metric']}. "
+                f"Root cause in {table_name}. Owner: {causation['table_owner']}.")
+        # escape every interpolated value with json.dumps (like _prop / _doc) so a quote
+        # or backslash in a field can never break the GraphQL string.
         q = (
             "mutation { raiseIncident(input: { type: OPERATIONAL, "
-            f'resourceUrn: "{table_urn}", '
-            f'title: "Silent drift: {causation["change_type"]} on {causation["drifted_feature"]}", '
-            f'description: "Traced from degraded model {model_urn}. {causation["drift_metric"]}. '
-            f'Root cause in {table_name}. Owner: {causation["table_owner"]}." }}) }}'
+            f"resourceUrn: {json.dumps(table_urn)}, "
+            f"title: {json.dumps(title)}, "
+            f"description: {json.dumps(desc)} }}) }}"
         )
         out = _graphql(q)
         incident_urn = out.get("data", {}).get("raiseIncident")
@@ -272,5 +299,10 @@ def write_back(model_urn: str, causation: dict[str, Any], rca_narrative: str,
     results["document"] = step("document", _doc)
     results["proposed_fix"] = step("proposed_fix", _fix)
     results["incident"] = step("incident", _incident)
-    results["slack"] = {"status": "done", "result": _slack()}
+    # reflect the real Slack outcome (an unconfigured or failed webhook is not "done")
+    slack_result = _slack()
+    results["slack"] = {
+        "status": "done" if slack_result in ("notified", "not configured") else "error",
+        "result": slack_result,
+    }
     return results
