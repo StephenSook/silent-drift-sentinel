@@ -70,6 +70,8 @@ def lineage_graph(model_urn: str, drifted_feature: str, harmful: bool = True) ->
             return urn
 
     nodes.append({
+        # deliberate short display label for the demo model (the full name
+        # online_shoppers_purchase_intent overflows the node card)
         "id": model_urn, "kind": "model", "label": "purchase_intent",
         "status": "degraded" if harmful else "ok",
         "owner": (model_own.owners[0].owner.split(":")[-1] if model_own and model_own.owners else None),

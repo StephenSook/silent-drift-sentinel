@@ -87,3 +87,23 @@ def test_wal_rewrites_when_the_diagnosis_changes(monkeypatch, tmp_path):
     writeback.write_back(MODEL, other, "rca", TABLE)  # a structurally different cause
     assert len(calls) > n1  # the stale WAL is cleared, so the new cause is written
     assert any("default_value_regression" in q for q in calls)
+
+
+def test_writeback_complete_true_after_a_full_write(monkeypatch, tmp_path):
+    _mock(monkeypatch, tmp_path)
+    writeback.write_back(MODEL, CAUSATION, "rca", TABLE, proposed_fix={"dbt": "x"})
+    assert writeback.writeback_complete(MODEL) is True
+
+
+def test_writeback_complete_false_when_a_step_errors(monkeypatch, tmp_path):
+    _mock(monkeypatch, tmp_path)
+
+    # make only the incident step fail, leaving the write-back incomplete
+    def graphql(q):
+        if "raiseIncident" in q:
+            raise RuntimeError("boom")
+        return {"data": {}}
+
+    monkeypatch.setattr(writeback, "_graphql", graphql)
+    writeback.write_back(MODEL, CAUSATION, "rca", TABLE, proposed_fix={"dbt": "x"})
+    assert writeback.writeback_complete(MODEL) is False

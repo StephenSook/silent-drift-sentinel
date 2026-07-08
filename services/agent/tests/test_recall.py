@@ -52,10 +52,20 @@ def test_route_ends_when_benign():
     assert nodes.route_after_detect(_state(BENIGN)) == "end"
 
 
-def test_detect_stashes_prior_when_it_matches(monkeypatch):
+def test_detect_stashes_prior_when_it_matches_and_write_complete(monkeypatch):
     monkeypatch.setattr(writeback, "read_recorded_state", lambda urn: PRIOR)
+    monkeypatch.setattr(writeback, "writeback_complete", lambda urn: True)
     out = nodes.detect(_state(HARMFUL))
     assert out["prior_causation"] == PRIOR
+
+
+def test_detect_does_not_recall_when_the_prior_write_is_incomplete(monkeypatch):
+    # a matching prior cause but an incomplete prior write must NOT recall; the run
+    # proceeds so the WAL retries the missing steps
+    monkeypatch.setattr(writeback, "read_recorded_state", lambda urn: PRIOR)
+    monkeypatch.setattr(writeback, "writeback_complete", lambda urn: False)
+    out = nodes.detect(_state(HARMFUL))
+    assert "prior_causation" not in out
 
 
 def test_detect_ignores_prior_that_does_not_match(monkeypatch):

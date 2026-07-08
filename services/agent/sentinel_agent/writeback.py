@@ -115,11 +115,19 @@ def read_recorded_state(model_urn: str) -> dict[str, Any] | None:
         return None
 
 
+def writeback_complete(model_urn: str) -> bool:
+    """True if a prior write-back recorded every step as done. Gates the recall
+    short-circuit: a partial or failed write should be re-run and retried through the
+    WAL, not recalled as if it were finished."""
+    steps = _load_wal(_slug(model_urn)).get("steps", {})
+    required = ("structured_property", "tag", "document", "proposed_fix", "incident")
+    return bool(steps) and all(steps.get(s, {}).get("status") == "done" for s in required)
+
+
 def reset_writeback(model_urn: str, table_urn: str = "") -> dict[str, Any]:
     """Undo the write-back so the demo re-runs cleanly in front of judges: clear the
     drift_causation property + drift-degraded tag on the model, resolve the incident,
     and delete the write-ahead log so a re-run re-animates instead of skipping."""
-    from datahub.emitter.mce_builder import make_tag_urn
     key = _slug(model_urn)
     wal = _load_wal(key)
     out: dict[str, Any] = {}
@@ -179,7 +187,11 @@ def write_back(model_urn: str, causation: dict[str, Any], rca_narrative: str,
     # switching scenario and re-running live would find every step "done" and skip all
     # catalog writes, leaving the model showing the old cause while the UI reports the
     # new one. When the change_type differs, resolve the old incident and start fresh.
-    if wal.get("steps") and wal.get("causation", {}).get("change_type") != causation.get("change_type"):
+    prior_c = wal.get("causation", {})
+    if wal.get("steps") and (
+        prior_c.get("change_type") != causation.get("change_type")
+        or prior_c.get("drifted_feature") != causation.get("drifted_feature")
+    ):
         old_incident = (wal["steps"].get("incident", {}) or {}).get("result")
         if isinstance(old_incident, str) and old_incident.startswith("urn:li:incident"):
             try:

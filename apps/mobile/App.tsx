@@ -50,7 +50,7 @@ export default function App() {
   const [trace, setTrace] = useState<Trace[]>([]);
   const [finding, setFinding] = useState<{ thread_id: string; causation: Causation } | null>(null);
   const [result, setResult] = useState<WriteResult | null>(null);
-  const esRef = useRef<EventSource<"trace" | "awaiting_approval"> | null>(null);
+  const esRef = useRef<EventSource<"trace" | "awaiting_approval" | "done"> | null>(null);
 
   const run = useCallback(() => {
     esRef.current?.close();
@@ -58,7 +58,7 @@ export default function App() {
     setTrace([]);
     setFinding(null);
     setResult(null);
-    const es = new EventSource<"trace" | "awaiting_approval">(`${AGENT_URL}/api/stream?scenario=harmful`);
+    const es = new EventSource<"trace" | "awaiting_approval" | "done">(`${AGENT_URL}/api/stream?scenario=harmful`);
     esRef.current = es;
     es.addEventListener("trace", (e: { data?: string | null }) => {
       if (!e.data) return;
@@ -69,6 +69,13 @@ export default function App() {
       setFinding(JSON.parse(e.data as string) as { thread_id: string; causation: Causation });
       setStatus("awaiting");
       es.close();
+    });
+    // the recall path (and any non-approval run) ends with a "done" event, not an
+    // approval gate. Without this the stream stays open and react-native-sse
+    // reconnect-loops the agent every 5s while the app hangs on "Running...".
+    es.addEventListener("done", () => {
+      es.close();
+      setStatus((s) => (s === "running" ? "done" : s));
     });
     es.addEventListener("error", () => {
       es.close();

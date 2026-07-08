@@ -42,10 +42,11 @@ def detect(state: DriftState) -> dict[str, Any]:
         f"Harmful drift: {perf.get('metric')} {perf.get('reference')} -> "
         f"{perf.get('estimated_current')} (label-free CBPE), drop {perf.get('estimated_drop')}",
     ))
-    # close-the-loop: check whether the Sentinel already diagnosed and recorded this
-    # exact cause on the model. If so, route to recall instead of re-doing the work.
+    # close-the-loop: check whether the Sentinel already diagnosed and FULLY recorded
+    # this exact cause. Recall only when the prior write-back completed; a partial or
+    # failed write is re-run so the WAL retries the missing steps.
     prior = writeback.read_recorded_state(state.model_urn)
-    if prior and _prior_matches(prior, sig):
+    if prior and _prior_matches(prior, sig) and writeback.writeback_complete(state.model_urn):
         out["prior_causation"] = prior
         trace.append(event(
             "detect", "info",
