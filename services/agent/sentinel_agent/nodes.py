@@ -41,8 +41,15 @@ def traverse(state: DriftState) -> dict[str, Any]:
 
 
 def root_cause(state: DriftState) -> dict[str, Any]:
-    trace = [event("root_cause", "thinking", "Synthesizing root-cause analysis")]
-    narrative = llm.synthesize_rca(state.drift_signal, state.lineage)
+    # Read DataHub through the Agent Context Kit tools, then reason over the result.
+    _ctx, ack_log = datahub_io.gather_ack_context(state.model_urn, state.source_table)
+    trace = [
+        event("root_cause", "tool_call", f"{e['tool']} (Agent Context Kit): {e['summary']}")
+        for e in ack_log
+    ]
+    trace.append(event("root_cause", "thinking",
+                       "Synthesizing root-cause analysis over the catalog context"))
+    narrative = llm.synthesize_rca(state.drift_signal, state.lineage, ack_context=ack_log)
     trace.append(event("root_cause", "result", narrative))
     return {"rca_narrative": narrative, "trace": trace}
 

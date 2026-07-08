@@ -109,3 +109,37 @@ def agent_context_tools():
 
     client = DataHubClient(server=config.GMS_URL, token=config.GMS_TOKEN)
     return build_langchain_tools(client, include_mutations=False)
+
+
+def gather_ack_context(model_urn: str, table_urn: str) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    """Read DataHub THROUGH the Agent Context Kit tools (get_entities, get_lineage),
+    returning the gathered context plus a log of the ACK calls. This is the agent
+    genuinely using the Agent Context Kit, not just the raw SDK."""
+    tools = {t.name: t for t in agent_context_tools()}
+    log: list[dict[str, str]] = []
+    ctx: dict[str, Any] = {}
+
+    def call(name: str, payload: dict, summary: str) -> Any:
+        tool = tools.get(name)
+        if tool is None:
+            return None
+        try:
+            out = tool.invoke(payload)
+            log.append({"tool": name, "summary": summary})
+            return out
+        except Exception as e:  # noqa: BLE001
+            log.append({"tool": name, "summary": f"error: {type(e).__name__}"})
+            return None
+
+    ctx["model"] = call("get_entities", {"urns": [model_urn]}, "fetched model metadata + owner")
+    lin = call("get_lineage", {"urn": model_urn, "upstream": True, "max_hops": 2},
+               "walked upstream lineage")
+    if isinstance(lin, dict):
+        total = (lin.get("upstreams") or {}).get("total")
+        if total is not None and log:
+            log[-1]["summary"] = f"walked upstream lineage ({total} upstream assets)"
+    ctx["lineage"] = lin
+    if table_urn:
+        ctx["table"] = call("get_entities", {"urns": [table_urn]},
+                            "fetched upstream table schema + owner")
+    return ctx, log

@@ -24,7 +24,8 @@ def _sanitize(text: str) -> str:
     return text.replace(" — ", ", ").replace("—", ", ").replace("–", "-")
 
 
-def synthesize_rca(drift_signal: dict[str, Any], lineage: dict[str, Any]) -> str:
+def synthesize_rca(drift_signal: dict[str, Any], lineage: dict[str, Any],
+                   ack_context: list[dict[str, str]] | None = None) -> str:
     llm = ChatAnthropic(
         model=config.ANTHROPIC_MODEL,
         api_key=config.ANTHROPIC_API_KEY,
@@ -33,8 +34,12 @@ def synthesize_rca(drift_signal: dict[str, Any], lineage: dict[str, Any]) -> str
     human = (
         f"Drift signal:\n{json.dumps(drift_signal, indent=2)}\n\n"
         f"Lineage the agent walked:\n{json.dumps(lineage, indent=2)}\n\n"
-        "Write the RCA."
     )
+    if ack_context:
+        human += (
+            f"Catalog reads via the Agent Context Kit:\n{json.dumps(ack_context, indent=2)}\n\n"
+        )
+    human += "Write the RCA."
     msg = llm.invoke([("system", RCA_SYSTEM), ("human", human)])
     content = msg.content if isinstance(msg.content, str) else " ".join(
         b.get("text", "") for b in msg.content if isinstance(b, dict)
