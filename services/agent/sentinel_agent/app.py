@@ -37,6 +37,18 @@ def _callbacks() -> list:
         print(f"[langfuse] disabled ({type(e).__name__})")
         return []
 
+
+def _flush_langfuse() -> None:
+    """Push queued traces to Langfuse now, so a judge who just ran the agent sees
+    the trace immediately instead of waiting for the background flush interval."""
+    if not config.LANGFUSE_ENABLED:
+        return
+    try:
+        from langfuse import get_client
+        get_client().flush()
+    except Exception:  # noqa: BLE001 - tracing must never break the agent
+        pass
+
 # HITL: a durable Postgres checkpointer with an in-process fallback, plus the
 # interrupt graph, built at startup. GET /api/stream runs the read-only nodes and
 # stops before write_back; POST /api/approve resumes the same thread to write.
@@ -154,6 +166,7 @@ async def _live_stream(thread_id: str, scenario: str):
                 continue
             for ev in (update.get("trace") or []):
                 yield {"event": "trace", "data": json.dumps(ev)}
+    _flush_langfuse()
     # paused before write_back: ask the human to approve the mutation
     snap = await _GRAPH.aget_state(cfg)
     if snap.next and "write_back" in snap.next:
@@ -194,4 +207,5 @@ async def approve(thread_id: str) -> dict:
                     "causation": snap.values.get("causation", {}),
                     "result": update.get("writeback_result"),
                 }
+    _flush_langfuse()
     return {"trace": trace, "writeback": json.loads(json.dumps(writeback, default=str))}

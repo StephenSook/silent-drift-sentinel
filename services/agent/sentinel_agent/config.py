@@ -43,6 +43,9 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # Optional Langfuse tracing of the LangGraph run; the SDK reads LANGFUSE_PUBLIC_KEY
 # / LANGFUSE_SECRET_KEY / LANGFUSE_HOST from the env. No-op if the keys are absent.
+# Accept LANGFUSE_BASE_URL as an alias for LANGFUSE_HOST (either naming works).
+if not os.environ.get("LANGFUSE_HOST") and os.environ.get("LANGFUSE_BASE_URL"):
+    os.environ["LANGFUSE_HOST"] = os.environ["LANGFUSE_BASE_URL"]
 LANGFUSE_ENABLED = bool(os.environ.get("LANGFUSE_PUBLIC_KEY") and os.environ.get("LANGFUSE_SECRET_KEY"))
 
 # LLM request timeout (seconds) so a hung provider can't stall the SSE stream.
