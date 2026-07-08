@@ -5,8 +5,10 @@ import {
   Background,
   Controls,
   type Edge,
+  Handle,
   MarkerType,
   type Node,
+  Position,
   ReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -33,6 +35,7 @@ function EntityNode({ data }: { data: LineageNode }) {
   const k = KIND[data.kind];
   const ring = RING[data.status];
   const active = ring !== "transparent";
+  const hidden = { opacity: 0, width: 1, height: 1, minWidth: 0, border: "none", background: "transparent" };
   return (
     <div
       className="rounded-card border bg-surface-1 px-3 py-2"
@@ -42,6 +45,10 @@ function EntityNode({ data }: { data: LineageNode }) {
         boxShadow: active ? `0 0 0 1px ${ring}, 0 0 26px -8px ${ring}` : "none",
       }}
     >
+      {/* invisible handles so React Flow can attach the lineage edges (left in,
+          right out), matching the left-to-right ELK layout */}
+      <Handle type="target" position={Position.Left} isConnectable={false} style={hidden} />
+      <Handle type="source" position={Position.Right} isConnectable={false} style={hidden} />
       <div className="font-mono text-[9px] tracking-[0.18em]" style={{ color: k.accent }}>
         {k.glyph}
       </div>
