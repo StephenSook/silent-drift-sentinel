@@ -313,6 +313,12 @@ export default function Home() {
               >
                 View on GitHub
               </a>
+              <Link
+                href="/how-it-works"
+                className="rounded-md border border-border px-5 py-2.5 text-sm font-medium text-muted transition-colors hover:border-border-strong"
+              >
+                How it works
+              </Link>
             </div>
           </Reveal>
         </div>

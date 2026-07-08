@@ -31,15 +31,22 @@ The novelty sits at the seam of parts 2 and 4. We state it as "no public prior a
 
 ## Architecture
 
+```mermaid
+flowchart TB
+  DET["Two-layer drift detector<br/>CBPE + KS / Chi-squared + FDR"] -->|drift signal| D
+
+  subgraph AGENT["LangGraph agent (FastAPI + SSE, on the VM)"]
+    direction LR
+    D[Detect] --> T[Traverse] --> R[Root-Cause] --> O[Identify Owner] --> H{Human<br/>approval} --> W[Write-Back]
+  end
+
+  R -.->|prose only| LLM["Claude<br/>(LiteLLM fallback)"]
+  T <-->|Agent Context Kit reads| DH[("DataHub OSS<br/>ML lineage + metadata")]
+  W -->|structured property + document<br/>on model, incident on upstream| DH
+  DASH["Next.js dashboard<br/>(Vercel)"] <-->|SSE stream + REST| AGENT
 ```
-Next.js dashboard (Vercel)
-   |  SSE (AG-UI-style events)
-FastAPI + LangGraph agent  ]  co-located on one always-on cloud VM (systemd + Caddy TLS)
-DataHub OSS + Agent Context Kit ]
-   |
-   +-- Anthropic Claude (root-cause narrative only, kept out of the write path)
-   +-- Postgres / drift artifacts / write-ahead log
-```
+
+The agent runs on one always-on cloud VM behind Caddy TLS; the dashboard is on Vercel. Claude writes only the prose narrative and is kept out of the write path, which is deterministic and idempotent (write-ahead log).
 
 - **ML core (`ml/`)**: a calibrated LightGBM purchase-intent model on the UCI Online Shoppers dataset (CC BY 4.0). Honest temporal split, isotonic calibration verified with ECE and a reliability diagram.
 - **Drift detector (`ml/sentinel_ml/drift.py`)**: two layers. Primary is NannyML CBPE label-free performance estimation. Diagnostic is per-feature drift (KS, Chi-squared) with Benjamini-Hochberg FDR correction, a PCA reconstruction check, and data-quality fingerprinting. It distinguishes a harmful null/default regression (which degrades the model) from a benign unit rescale (which does not), and only alarms on the former.
