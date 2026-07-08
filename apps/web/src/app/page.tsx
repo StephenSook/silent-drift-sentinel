@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
 import DriftField from "./DriftField";
+import SmoothScroll from "./SmoothScroll";
+import CinematicScroll from "./CinematicScroll";
 
 const REPO = "https://github.com/StephenSook/silent-drift-sentinel";
 
@@ -43,15 +45,19 @@ function Label({ children }: { children: ReactNode }) {
 export default function Home() {
   return (
     <main className="relative flex flex-col bg-bg">
+      <SmoothScroll />
+      <CinematicScroll />
       {/* ---- hero ---- */}
-      <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 py-24">
-        <DriftField />
+      <section data-hero className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 py-24">
+        <div data-hero-field className="absolute inset-0">
+          <DriftField />
+        </div>
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
           style={{ background: "radial-gradient(90% 75% at 50% 42%, transparent, oklch(0.14 0.006 264 / 0.5) 80%, var(--color-bg) 100%)" }}
         />
-        <div className="relative z-10 flex w-full max-w-3xl flex-col items-center text-center">
+        <div data-hero-content className="relative z-10 flex w-full max-w-3xl flex-col items-center text-center">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
