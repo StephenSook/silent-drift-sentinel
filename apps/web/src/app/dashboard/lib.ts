@@ -47,6 +47,17 @@ export async function fetchDrift(scenario: Scenario = "harmful"): Promise<Drift>
   return r.json();
 }
 
+export type ModelCard = {
+  reference?: Record<string, number>;
+  split_sizes?: Record<string, number>;
+  n_features?: number;
+  best_iteration?: number;
+};
+export async function fetchModelCard(): Promise<ModelCard> {
+  const r = await fetch(`${AGENT_URL}/api/model-card`);
+  return r.json();
+}
+
 export type Approval = { thread_id: string; causation: Record<string, string> };
 
 export type RunState = {

@@ -71,6 +71,12 @@ def drift(scenario: str = "harmful") -> dict:
     return json.loads(p.read_text()) if p.exists() else {}
 
 
+@app.get("/api/model-card")
+def model_card() -> dict:
+    p = config.ARTIFACTS_DIR / "metrics.json"
+    return json.loads(p.read_text()) if p.exists() else {}
+
+
 async def _live_stream(thread_id: str, scenario: str):
     sig = _load_signal(scenario)
     init = DriftState(

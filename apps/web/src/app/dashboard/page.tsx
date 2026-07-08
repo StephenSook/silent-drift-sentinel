@@ -6,9 +6,11 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   fetchDrift,
   fetchLineage,
+  fetchModelCard,
   useAgentRun,
   type Drift,
   type Lineage,
+  type ModelCard,
   type Scenario,
 } from "./lib";
 
@@ -45,16 +47,42 @@ function Empty({ label }: { label: string }) {
   return <div className="flex h-full items-center justify-center text-xs text-subtle">{label}</div>;
 }
 
+function Metric({ label, value }: { label: string; value?: number }) {
+  return (
+    <div>
+      <div className="tnum font-display text-xl leading-none text-fg">{value?.toFixed(3) ?? "-"}</div>
+      <div className="mt-1 font-mono text-[9px] tracking-widest text-subtle">{label}</div>
+    </div>
+  );
+}
+
+function CalRow({ label, raw, cal }: { label: string; raw?: number; cal?: number }) {
+  return (
+    <div className="mt-1.5 flex items-center gap-2 text-[10px]">
+      <span className="w-9 font-mono text-subtle">{label}</span>
+      <span className="tnum font-mono text-muted">{raw?.toFixed(3) ?? "-"}</span>
+      <span className="text-subtle">to</span>
+      <span className="tnum font-mono text-healthy">{cal?.toFixed(3) ?? "-"}</span>
+      <span className="text-subtle">after isotonic calibration</span>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { state, run, approve } = useAgentRun();
   const [scenario, setScenario] = useState<Scenario>("harmful");
   const [lineage, setLineage] = useState<Lineage | null>(null);
   const [drift, setDrift] = useState<Drift | null>(null);
+  const [card, setCard] = useState<ModelCard | null>(null);
 
   useEffect(() => {
     fetchLineage(scenario).then(setLineage).catch(() => {});
     fetchDrift(scenario).then(setDrift).catch(() => {});
   }, [scenario]);
+
+  useEffect(() => {
+    fetchModelCard().then(setCard).catch(() => {});
+  }, []);
 
   const revealed =
     state.trace.some((t) => t.node === "traverse" && t.kind === "tool_result") || !!state.writeback;
@@ -260,6 +288,28 @@ export default function Dashboard() {
                 )}
               </AnimatePresence>
             </div>
+
+            {card?.reference && (
+              <div className="mt-4">
+                <div className="mb-2 font-mono text-[10px] tracking-widest text-subtle">MODEL CARD</div>
+                <div className="space-y-2.5 rounded-card border border-border bg-surface-1 p-3">
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <Metric label="ROC-AUC" value={card.reference.roc_auc} />
+                    <Metric label="PR-AUC" value={card.reference.pr_auc} />
+                    <Metric label="F1" value={card.reference["f1_at_0.5"]} />
+                  </div>
+                  <div className="border-t border-border pt-2">
+                    <CalRow label="ECE" raw={card.reference.ece_raw} cal={card.reference.ece_calibrated} />
+                    <CalRow label="Brier" raw={card.reference.brier_raw} cal={card.reference.brier_calibrated} />
+                  </div>
+                  <div className="border-t border-border pt-2 text-[10px] leading-relaxed text-subtle">
+                    LightGBM, {card.n_features} features, best iteration {card.best_iteration}. Honest
+                    temporal split: {card.split_sizes?.train_fit} train / {card.split_sizes?.calib} calib
+                    / {card.split_sizes?.reference} reference / {card.split_sizes?.production} production.
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </section>
       </div>
