@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import json
 import os
+import uuid
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from langgraph.checkpoint.memory import MemorySaver
 from sse_starlette.sse import EventSourceResponse
 
 from . import config, datahub_io, demo
@@ -28,6 +30,12 @@ app.add_middleware(
 
 _SIGNAL = config.ARTIFACTS_DIR / "drift_signal.json"
 _SSE_HEADERS = {"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
+
+# HITL: one interrupt graph plus an in-process checkpointer. GET /api/stream runs
+# the read-only nodes and stops before write_back (no mutation on a GET); the
+# explicit POST /api/approve resumes the same thread to execute the write.
+_CHECKPOINTER = MemorySaver()
+_GRAPH = build_graph(checkpointer=_CHECKPOINTER, interrupt_before_writeback=True)
 
 
 def _load_signal() -> dict:
@@ -56,27 +64,58 @@ def drift() -> dict:
     return json.loads(p.read_text()) if p.exists() else {}
 
 
-async def _live_stream():
+async def _live_stream(thread_id: str):
     sig = _load_signal()
-    graph = build_graph()
     init = DriftState(
         drift_signal=sig, model_urn=config.MODEL_URN,
         root_cause_feature=sig.get("root_cause_feature", ""),
     )
+    cfg = {"configurable": {"thread_id": thread_id}}
     yield {"event": "start", "data": json.dumps({"model_urn": config.MODEL_URN, "mode": "live"})}
-    async for chunk in graph.astream(init, stream_mode="updates"):
+    # runs detect -> traverse -> root_cause -> identify_owner, then interrupts
+    async for chunk in _GRAPH.astream(init, config=cfg, stream_mode="updates"):
         for _node, update in chunk.items():
+            if not isinstance(update, dict):  # e.g. the __interrupt__ marker
+                continue
             for ev in (update.get("trace") or []):
                 yield {"event": "trace", "data": json.dumps(ev)}
-            if update.get("writeback_result"):
-                yield {"event": "writeback", "data": json.dumps(
-                    {"causation": update.get("causation"), "result": update.get("writeback_result")},
-                    default=str,
-                )}
-    yield {"event": "done", "data": json.dumps({"ok": True})}
+    # paused before write_back: ask the human to approve the mutation
+    snap = _GRAPH.get_state(cfg)
+    if snap.next and "write_back" in snap.next:
+        yield {"event": "awaiting_approval", "data": json.dumps(
+            {"thread_id": thread_id, "causation": snap.values.get("causation", {})}, default=str,
+        )}
+    else:
+        yield {"event": "done", "data": json.dumps({"ok": True})}
 
 
 @app.get("/api/stream")
 async def stream(demo_mode: bool = False):
-    gen = demo.demo_stream(config.MODEL_URN) if demo_mode else _live_stream()
+    if demo_mode:
+        gen = demo.demo_stream(config.MODEL_URN)
+    else:
+        gen = _live_stream(uuid.uuid4().hex)
     return EventSourceResponse(gen, headers=_SSE_HEADERS)
+
+
+@app.post("/api/approve")
+async def approve(thread_id: str) -> dict:
+    """Resume the interrupted graph to execute the write-back. This is the only
+    path that mutates the catalog, and it is an explicit POST, not a GET."""
+    cfg = {"configurable": {"thread_id": thread_id}}
+    snap = _GRAPH.get_state(cfg)
+    if not snap.next or "write_back" not in snap.next:
+        return {"error": "no pending write-back for this thread"}
+    trace: list = []
+    writeback = None
+    async for chunk in _GRAPH.astream(None, config=cfg, stream_mode="updates"):
+        for _node, update in chunk.items():
+            if not isinstance(update, dict):
+                continue
+            trace.extend(update.get("trace") or [])
+            if update.get("writeback_result"):
+                writeback = {
+                    "causation": snap.values.get("causation", {}),
+                    "result": update.get("writeback_result"),
+                }
+    return {"trace": trace, "writeback": json.loads(json.dumps(writeback, default=str))}

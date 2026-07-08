@@ -55,13 +55,9 @@ def root_cause(state: DriftState) -> dict[str, Any]:
 
 
 def identify_owner(state: DriftState) -> dict[str, Any]:
+    # Compute the causation object here, before the write-back gate, so the
+    # human approving the write can see exactly what will be recorded.
     owner = state.table_owner or state.model_owner or "unknown"
-    return {"trace": [event("identify_owner", "result", f"Owner to notify: {owner}")]}
-
-
-def write_back(state: DriftState) -> dict[str, Any]:
-    if not state.approved:
-        return {"trace": [event("write_back", "blocked", "Awaiting human approval before writing to the catalog")]}
     sig = state.drift_signal
     perf = sig.get("performance", {})
     causation = {
@@ -75,10 +71,20 @@ def write_back(state: DriftState) -> dict[str, Any]:
         "table_owner": state.table_owner,
         "detected_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
+    return {
+        "causation": causation,
+        "trace": [event("identify_owner", "result", f"Owner to notify: {owner}")],
+    }
+
+
+def write_back(state: DriftState) -> dict[str, Any]:
+    # Reached only after the human-in-the-loop interrupt is resumed. Deterministic:
+    # writes the causation computed upstream, never anything the LLM produced live.
+    causation = state.causation
     trace = [event("write_back", "tool_call",
                    "Writing drift_causation property, drift-degraded tag, and RCA document on "
                    "the model, plus an incident on the upstream table")]
     result = writeback.write_back(state.model_urn, causation, state.rca_narrative, state.source_table)
     summary = ", ".join(f"{k}={v.get('status')}" for k, v in result.items())
     trace.append(event("write_back", "tool_result", f"Wrote: {summary}"))
-    return {"causation": causation, "writeback_result": result, "trace": trace}
+    return {"writeback_result": result, "trace": trace}

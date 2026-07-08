@@ -31,7 +31,15 @@ def _recorded(model_urn: str) -> list[dict[str, Any]]:
         (0.4, "trace", {"node": "root_cause", "kind": "thinking", "message": "Synthesizing root-cause analysis over the catalog context"}),
         (1.4, "trace", {"node": "root_cause", "kind": "result", "message": _RCA}),
         (0.5, "trace", {"node": "identify_owner", "kind": "result", "message": "Owner to notify: urn:li:corpGroup:data-engineering"}),
-        (0.6, "trace", {"node": "write_back", "kind": "tool_call", "message": "Writing drift_causation property, drift-degraded tag, and RCA document on the model, plus an incident on the upstream table"}),
+        (0.7, "awaiting_approval", {"thread_id": "demo", "causation": {
+            "drifted_feature": "PageValues", "root_cause_urn": _TABLE,
+            "change_type": "null_default_regression",
+            "drift_metric": "roc_auc 0.808->0.7131 (label-free CBPE), drop 0.0949",
+            "model_owner": "urn:li:corpuser:jane.doe",
+            "table_owner": "urn:li:corpGroup:data-engineering",
+            "detected_at": "2026-07-07T22:23:47+00:00",
+        }}),
+        (1.2, "trace", {"node": "write_back", "kind": "tool_call", "message": "Writing drift_causation property, drift-degraded tag, and RCA document on the model, plus an incident on the upstream table"}),
         (1.0, "writeback", {
             "causation": {
                 "drifted_feature": "PageValues", "root_cause_urn": _TABLE,

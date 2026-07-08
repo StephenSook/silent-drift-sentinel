@@ -45,7 +45,7 @@ function Empty({ label }: { label: string }) {
 }
 
 export default function Dashboard() {
-  const { state, run } = useAgentRun();
+  const { state, run, approve } = useAgentRun();
   const [lineage, setLineage] = useState<Lineage | null>(null);
   const [drift, setDrift] = useState<Drift | null>(null);
 
@@ -58,6 +58,8 @@ export default function Dashboard() {
     state.trace.some((t) => t.node === "traverse" && t.kind === "tool_result") || !!state.writeback;
   const wb = state.writeback;
   const running = state.status === "running";
+  const busy = running || state.status === "awaiting";
+  const awaiting = state.status === "awaiting" && !!state.approval;
 
   return (
     <main className="flex h-screen flex-col overflow-hidden bg-bg">
@@ -71,16 +73,24 @@ export default function Dashboard() {
           <span className="font-mono text-[11px] text-subtle">/ online_shoppers_purchase_intent</span>
         </div>
         <div className="flex items-center gap-2">
+          {awaiting && (
+            <button
+              onClick={() => state.approval && approve(state.approval.thread_id)}
+              className="animate-pulse rounded-md border border-degraded/60 bg-degraded-soft px-3 py-1.5 text-xs font-medium text-degraded transition-colors hover:bg-degraded/20"
+            >
+              Approve write-back
+            </button>
+          )}
           <button
             onClick={() => run(false)}
-            disabled={running}
+            disabled={busy}
             className="rounded-md border border-accent/40 bg-accent-soft px-3 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/20 disabled:opacity-40"
           >
-            {running ? "Running..." : "Run agent (live)"}
+            {busy ? (awaiting ? "Awaiting approval" : "Running...") : "Run agent (live)"}
           </button>
           <button
             onClick={() => run(true)}
-            disabled={running}
+            disabled={busy}
             className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-border-strong disabled:opacity-40"
           >
             Demo

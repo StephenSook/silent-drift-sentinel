@@ -45,11 +45,15 @@ export async function fetchDrift(): Promise<Drift> {
   return r.json();
 }
 
+export type Approval = { thread_id: string; causation: Record<string, string> };
+
 export type RunState = {
-  status: "idle" | "running" | "done";
+  status: "idle" | "running" | "awaiting" | "done";
   trace: TraceEvent[];
   writeback?: WriteBack;
   activeNode?: string;
+  approval?: Approval;
+  demo?: boolean;
 };
 
 export function useAgentRun() {
@@ -58,13 +62,18 @@ export function useAgentRun() {
 
   const run = useCallback((demo: boolean) => {
     esRef.current?.close();
-    setState({ status: "running", trace: [] });
+    setState({ status: "running", trace: [], demo });
     const es = new EventSource(`${AGENT_URL}/api/stream?demo_mode=${demo}`);
     esRef.current = es;
 
     es.addEventListener("trace", (e) => {
       const ev = JSON.parse((e as MessageEvent).data) as TraceEvent;
       setState((s) => ({ ...s, trace: [...s.trace, ev], activeNode: ev.node }));
+    });
+    es.addEventListener("awaiting_approval", (e) => {
+      const a = JSON.parse((e as MessageEvent).data) as Approval;
+      // the demo replay auto-proceeds; a live run waits for the human
+      setState((s) => ({ ...s, approval: a, status: s.demo ? "running" : "awaiting" }));
     });
     es.addEventListener("writeback", (e) => {
       const wb = JSON.parse((e as MessageEvent).data) as WriteBack;
@@ -76,9 +85,22 @@ export function useAgentRun() {
     });
     es.onerror = () => {
       es.close();
-      setState((s) => ({ ...s, status: "done" }));
+      // a live run closes the stream at the approval gate; preserve that state
+      setState((s) => (s.status === "running" ? { ...s, status: "done" } : s));
     };
   }, []);
 
-  return { state, run };
+  const approve = useCallback(async (threadId: string) => {
+    setState((s) => ({ ...s, status: "running", approval: undefined }));
+    const r = await fetch(`${AGENT_URL}/api/approve?thread_id=${threadId}`, { method: "POST" });
+    const data = (await r.json()) as { trace?: TraceEvent[]; writeback?: WriteBack };
+    setState((s) => ({
+      ...s,
+      trace: [...s.trace, ...(data.trace ?? [])],
+      writeback: data.writeback ?? s.writeback,
+      status: "done",
+    }));
+  }, []);
+
+  return { state, run, approve };
 }
