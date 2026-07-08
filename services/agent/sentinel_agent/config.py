@@ -20,6 +20,11 @@ GMS_TOKEN = os.environ.get("DATAHUB_GMS_TOKEN") or None
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5")
 
+# LiteLLM fallback for the RCA narrative when the primary provider errors. Defaults
+# to a second Anthropic model; set SENTINEL_FALLBACK_MODEL to an openai/* or gemini/*
+# model (with that provider's key in the env) for a genuine cross-provider fallback.
+FALLBACK_MODEL = os.environ.get("SENTINEL_FALLBACK_MODEL", "anthropic/claude-haiku-4-5-20251001")
+
 MODEL_URN = os.environ.get(
     "SENTINEL_MODEL_URN",
     "urn:li:mlModel:(urn:li:dataPlatform:mlflow,online_shoppers_purchase_intent,PROD)",

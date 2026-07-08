@@ -24,13 +24,14 @@ def _sanitize(text: str) -> str:
     return text.replace(" — ", ", ").replace("—", ", ").replace("–", "-")
 
 
+def _extract(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    return " ".join(b.get("text", "") for b in content if isinstance(b, dict))
+
+
 def synthesize_rca(drift_signal: dict[str, Any], lineage: dict[str, Any],
                    ack_context: list[dict[str, str]] | None = None) -> str:
-    llm = ChatAnthropic(
-        model=config.ANTHROPIC_MODEL,
-        api_key=config.ANTHROPIC_API_KEY,
-        max_tokens=700,
-    )
     human = (
         f"Drift signal:\n{json.dumps(drift_signal, indent=2)}\n\n"
         f"Lineage the agent walked:\n{json.dumps(lineage, indent=2)}\n\n"
@@ -40,8 +41,18 @@ def synthesize_rca(drift_signal: dict[str, Any], lineage: dict[str, Any],
             f"Catalog reads via the Agent Context Kit:\n{json.dumps(ack_context, indent=2)}\n\n"
         )
     human += "Write the RCA."
-    msg = llm.invoke([("system", RCA_SYSTEM), ("human", human)])
-    content = msg.content if isinstance(msg.content, str) else " ".join(
-        b.get("text", "") for b in msg.content if isinstance(b, dict)
-    )
-    return _sanitize(content.strip())
+    try:
+        llm = ChatAnthropic(
+            model=config.ANTHROPIC_MODEL, api_key=config.ANTHROPIC_API_KEY, max_tokens=700,
+        )
+        msg = llm.invoke([("system", RCA_SYSTEM), ("human", human)])
+        return _sanitize(_extract(msg.content).strip())
+    except Exception:  # noqa: BLE001 - provider failover so a live run survives an outage
+        import litellm
+        resp = litellm.completion(
+            model=config.FALLBACK_MODEL,
+            messages=[{"role": "system", "content": RCA_SYSTEM},
+                      {"role": "user", "content": human}],
+            max_tokens=700,
+        )
+        return _sanitize((resp.choices[0].message.content or "").strip())
