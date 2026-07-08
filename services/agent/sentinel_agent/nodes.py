@@ -9,19 +9,73 @@ from . import datahub_io, fixgen, llm, writeback
 from .state import DriftState, event
 
 
+def _prior_matches(prior: dict[str, Any], signal: dict[str, Any]) -> bool:
+    """True if a recorded drift_causation describes the same feature (and change type)
+    as the current signal, so the agent can recognize its own prior diagnosis."""
+    value = (prior or {}).get("causation_value") or ""
+    feature = signal.get("root_cause_feature") or ""
+    change_type = signal.get("change_type") or ""
+    if not value or not feature or feature not in value:
+        return False
+    return not change_type or change_type in value
+
+
+def route_after_detect(state: DriftState) -> str:
+    """Route out of Detect: stop on a benign shift, recall a cause the agent already
+    recorded on the model, otherwise walk the lineage for a fresh diagnosis."""
+    if not state.drift_signal.get("harmful"):
+        return "end"
+    return "recall" if state.prior_causation else "traverse"
+
+
 def detect(state: DriftState) -> dict[str, Any]:
     sig = state.drift_signal
     perf = sig.get("performance", {})
     trace = [event("detect", "info", f"Drift signal received for {state.model_urn}")]
+    out: dict[str, Any] = {"root_cause_feature": sig.get("root_cause_feature", "")}
     if not sig.get("harmful"):
         trace.append(event("detect", "info", "Distribution drift detected but performance is unaffected; no alarm"))
-    else:
+        out["trace"] = trace
+        return out
+    trace.append(event(
+        "detect", "alarm",
+        f"Harmful drift: {perf.get('metric')} {perf.get('reference')} -> "
+        f"{perf.get('estimated_current')} (label-free CBPE), drop {perf.get('estimated_drop')}",
+    ))
+    # close-the-loop: check whether the Sentinel already diagnosed and recorded this
+    # exact cause on the model. If so, route to recall instead of re-doing the work.
+    prior = writeback.read_recorded_state(state.model_urn)
+    if prior and _prior_matches(prior, sig):
+        out["prior_causation"] = prior
         trace.append(event(
-            "detect", "alarm",
-            f"Harmful drift: {perf.get('metric')} {perf.get('reference')} -> "
-            f"{perf.get('estimated_current')} (label-free CBPE), drop {perf.get('estimated_drop')}",
+            "detect", "info",
+            "A drift_causation record already exists on this model in the catalog; "
+            "this matches a cause the Sentinel already diagnosed",
         ))
-    return {"root_cause_feature": sig.get("root_cause_feature", ""), "trace": trace}
+    out["trace"] = trace
+    return out
+
+
+def recall(state: DriftState) -> dict[str, Any]:
+    """The agent recognizes a cause it already recorded on the model and short-circuits:
+    no re-diagnosis, no duplicate incident. The thesis made concrete, the next on-call
+    agent inherits the knowledge straight from the model entity in the catalog."""
+    prior = state.prior_causation or {}
+    value = prior.get("causation_value") or ""
+    fix = prior.get("fix_value")
+    trace = [
+        event("recall", "tool_call",
+              "Reading the drift_causation the Sentinel previously wrote back from the catalog"),
+        event("recall", "result", f"Known cause, already on record: {value}"),
+    ]
+    if fix:
+        trace.append(event("recall", "info", f"A proposed fix is already recorded on the model: {fix}"))
+    trace.append(event(
+        "recall", "result",
+        "No re-diagnosis and no duplicate incident. The next on-call agent inherited the "
+        "knowledge from the model itself.",
+    ))
+    return {"trace": trace, "writeback_result": {"recalled": {"status": "recalled"}}}
 
 
 def traverse(state: DriftState) -> dict[str, Any]:

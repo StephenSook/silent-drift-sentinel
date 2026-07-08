@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL ?? "http://localhost:8130";
 export const DATAHUB_URL =
@@ -112,6 +112,9 @@ export type RunState = {
   verified?: CatalogProof;
   unreachable?: boolean;
   proposedFix?: ProposedFix;
+  // close-the-loop: this run recognized a cause the agent already recorded and
+  // short-circuited (no re-diagnosis, no duplicate write)
+  recalled?: boolean;
 };
 
 export function useAgentRun() {
@@ -147,7 +150,12 @@ export function useAgentRun() {
       setState((s) => ({ ...s, writeback: wb }));
     });
     es.addEventListener("done", () => {
-      setState((s) => ({ ...s, status: "done", activeNode: undefined }));
+      setState((s) => ({
+        ...s,
+        status: "done",
+        activeNode: undefined,
+        recalled: s.trace.some((t) => t.node === "recall"),
+      }));
       es.close();
     });
     es.onerror = () => {
@@ -186,6 +194,16 @@ export function useAgentRun() {
     setState({ status: "idle", trace: [] });
     if (clearCatalog) resetDemo().catch(() => {});
   }, []);
+
+  // when a run recalled a recorded cause, re-fetch the property FROM DataHub so the
+  // model-page panel can show the exact value the agent read back (proof, not claim)
+  useEffect(() => {
+    if (state.status === "done" && state.recalled && !state.verified) {
+      verifyCatalog()
+        .then((proof) => setState((s) => ({ ...s, verified: proof })))
+        .catch(() => {});
+    }
+  }, [state.status, state.recalled, state.verified]);
 
   return { state, run, approve, reset };
 }

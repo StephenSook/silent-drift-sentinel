@@ -156,6 +156,7 @@ export default function Dashboard() {
   const revealed =
     state.trace.some((t) => t.node === "traverse" && t.kind === "tool_result") || !!state.writeback;
   const wb = state.writeback;
+  const recalled = !!state.recalled;
   const running = state.status === "running";
   const busy = running || state.status === "awaiting";
   const awaiting = state.status === "awaiting" && !!state.approval;
@@ -213,6 +214,16 @@ export default function Dashboard() {
           >
             Demo
           </button>
+          {state.writeback && !recalled && (
+            <button
+              onClick={() => run(false, scenario)}
+              disabled={busy}
+              title="Run the agent again. It recognizes the cause it already recorded on the model and recalls it, instead of re-diagnosing or paging anyone twice."
+              className="rounded-md border border-accent/40 bg-accent-soft px-3 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/20 disabled:opacity-40"
+            >
+              Run again (recall)
+            </button>
+          )}
           {(state.writeback || state.status === "done") && (
             <button
               onClick={() => reset(true)}
@@ -316,7 +327,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between">
                 <span className="font-mono text-sm font-medium text-fg">purchase_intent</span>
                 <AnimatePresence>
-                  {wb && (
+                  {(wb || recalled) && (
                     <motion.span
                       initial={{ scale: 0, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
@@ -391,6 +402,29 @@ export default function Dashboard() {
                           Re-fetched from the catalog after the write, not the agent&apos;s claim.
                         </div>
                       </motion.div>
+                    )}
+                  </motion.div>
+                ) : recalled ? (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-3 space-y-2">
+                    <div className="rounded-md border border-accent/40 bg-accent-soft/40 p-2">
+                      <div className="font-mono text-[9px] tracking-widest text-accent">
+                        KNOWN CAUSE, RECALLED
+                      </div>
+                      <div className="mt-1 text-[11px] leading-relaxed text-muted">
+                        The Sentinel recognized a cause it already recorded on this model and
+                        short-circuited: no re-diagnosis, no duplicate incident. The next on-call
+                        agent inherited the knowledge straight from the catalog.
+                      </div>
+                    </div>
+                    {state.verified?.present && (
+                      <div className="rounded-md border border-healthy/40 bg-healthy-soft/40 p-2">
+                        <div className="font-mono text-[9px] tracking-widest text-healthy">
+                          READ BACK FROM DATAHUB
+                        </div>
+                        <div className="mt-1 break-all font-mono text-[9px] leading-relaxed text-fg">
+                          {state.verified.causation?.value}
+                        </div>
+                      </div>
                     )}
                   </motion.div>
                 ) : (

@@ -7,7 +7,7 @@ import asyncio
 import json
 from typing import Any
 
-from . import fixgen
+from . import fixgen, writeback
 
 _TABLE = "urn:li:dataset:(urn:li:dataPlatform:snowflake,ecommerce.web_sessions,PROD)"
 
@@ -65,8 +65,28 @@ def _recorded_benign(model_urn: str) -> list[Any]:
     ]
 
 
+def _recorded_recall(model_urn: str) -> list[Any]:
+    """The close-the-loop beat: a re-run recognizes the cause the Sentinel already
+    wrote onto the model and short-circuits, instead of re-diagnosing."""
+    value = writeback._causation_value(_CAUSATION)
+    return [
+        (0.4, "trace", {"node": "detect", "kind": "info", "message": f"Drift signal received for {model_urn}"}),
+        (0.7, "trace", {"node": "detect", "kind": "alarm", "message": "Harmful drift: roc_auc 0.808 -> 0.7131 (label-free CBPE), drop 0.0949"}),
+        (0.7, "trace", {"node": "detect", "kind": "info", "message": "A drift_causation record already exists on this model in the catalog; this matches a cause the Sentinel already diagnosed"}),
+        (0.6, "trace", {"node": "recall", "kind": "tool_call", "message": "Reading the drift_causation the Sentinel previously wrote back from the catalog"}),
+        (1.1, "trace", {"node": "recall", "kind": "result", "message": f"Known cause, already on record: {value}"}),
+        (0.7, "trace", {"node": "recall", "kind": "info", "message": f"A proposed fix is already recorded on the model: {_FIX['summary']}"}),
+        (0.9, "trace", {"node": "recall", "kind": "result", "message": "No re-diagnosis and no duplicate incident. The next on-call agent inherited the knowledge from the model itself."}),
+    ]
+
+
 async def demo_stream(model_urn: str, scenario: str = "harmful"):
-    recorded = _recorded_benign(model_urn) if scenario == "benign" else _recorded(model_urn)
+    if scenario == "benign":
+        recorded = _recorded_benign(model_urn)
+    elif scenario == "recall":
+        recorded = _recorded_recall(model_urn)
+    else:
+        recorded = _recorded(model_urn)
     yield {"event": "start", "data": json.dumps({"model_urn": model_urn, "mode": "demo"})}
     for delay, event, data in recorded:
         await asyncio.sleep(delay)

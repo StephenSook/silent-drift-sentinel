@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from langchain_anthropic import ChatAnthropic
-
 from . import config
 
 RCA_SYSTEM = (
@@ -63,6 +61,9 @@ def synthesize_rca(drift_signal: dict[str, Any], lineage: dict[str, Any],
         )
     human += "Write the RCA."
     try:
+        # imported at call time so the pure agent modules stay importable (and the
+        # hermetic tests run) without the heavy LangChain dependency present.
+        from langchain_anthropic import ChatAnthropic
         llm = ChatAnthropic(
             model=config.ANTHROPIC_MODEL, api_key=config.ANTHROPIC_API_KEY, max_tokens=700,
             timeout=config.LLM_TIMEOUT, max_retries=1,

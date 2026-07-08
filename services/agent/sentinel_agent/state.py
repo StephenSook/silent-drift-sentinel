@@ -13,6 +13,10 @@ class DriftState(BaseModel):
     drift_signal: dict[str, Any]
     model_urn: str
 
+    # close-the-loop: a drift_causation the agent already wrote back and read again
+    # from the catalog on this run (set only when it matches the current signal)
+    prior_causation: dict[str, Any] = Field(default_factory=dict)
+
     # traverse
     lineage: dict[str, Any] = Field(default_factory=dict)
     root_cause_feature: str = ""

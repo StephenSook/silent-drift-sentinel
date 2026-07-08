@@ -85,6 +85,36 @@ def read_causation(model_urn: str) -> dict[str, Any] | None:
     }
 
 
+def read_recorded_state(model_urn: str) -> dict[str, Any] | None:
+    """Read back everything the Sentinel previously recorded on the model: the
+    drift_causation value, the proposed_fix value, and the drift-degraded tag. Used
+    by the close-the-loop path so a re-run can recognize a cause the agent already
+    diagnosed instead of re-doing the work. Defensive: any read failure returns None
+    so the caller falls through to a full fresh diagnosis (never blocks on a catalog
+    hiccup). Returns None when no drift_causation is present."""
+    try:
+        from datahub.ingestion.graph.client import DataHubGraph, DataHubGraphConfig
+        g = DataHubGraph(DataHubGraphConfig(server=config.GMS_URL, token=config.GMS_TOKEN))
+        sp = g.get_aspect(model_urn, StructuredPropertiesClass)
+        props = {
+            a.propertyUrn: (a.values[0] if a.values else None)
+            for a in (sp.properties or [])
+        } if sp else {}
+        causation_value = props.get(SP_URN)
+        if not causation_value:
+            return None
+        tags = g.get_aspect(model_urn, GlobalTagsClass)
+        tag_present = bool(tags and any("drift-degraded" in t.tag for t in (tags.tags or [])))
+        return {
+            "causation_value": causation_value,
+            "fix_value": props.get(FIX_SP_URN),
+            "tag_present": tag_present,
+            "source": "datahub",
+        }
+    except Exception:  # noqa: BLE001 - a catalog read failure must fall through to full diagnosis
+        return None
+
+
 def reset_writeback(model_urn: str, table_urn: str = "") -> dict[str, Any]:
     """Undo the write-back so the demo re-runs cleanly in front of judges: clear the
     drift_causation property + drift-degraded tag on the model, resolve the incident,
