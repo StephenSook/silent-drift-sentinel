@@ -66,6 +66,9 @@ services/agent/.wal/
 # ---- Playwright / screenshots ----
 .playwright-mcp/
 /dashboard-*.png
+/image*.png
+# dictated video brief (private, never commit)
+/demo video*
 
 # ---- Misc ----
 .cache/

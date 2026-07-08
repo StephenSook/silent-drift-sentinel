@@ -56,7 +56,7 @@ Everything below runs live against a real hosted DataHub, on real data, with no 
 | Tracing | **WIRED LIVE** | Langfuse traces of the LangGraph run (optional keys) |
 | Owner notification | **WIRED LIVE** | Slack incoming webhook on write-back |
 | Cross-provider fallback | **WIRED LIVE** | LiteLLM falls back to Gemini if the primary model errors |
-| Web + mobile | **WIRED LIVE** | Next.js 16 dashboard on Vercel + a native Expo on-call app (installable Android APK) wired to the same agent |
+| Web + mobile | **WIRED LIVE** | Next.js 16 dashboard on Vercel + a native Expo on-call app on **iOS and Android** (installable Android APK), wired to the same agent |
 | Monitored model | **REAL, SDK-EMITTED** | A real calibrated LightGBM, emitted into the catalog as an `mlModel` on the MLflow platform via the DataHub Python SDK (no separate running MLflow server) |
 | ACK `get_lineage` via search index | **PARTIAL, BY DESIGN** | Returns 0 upstream via the async graph index on a fresh catalog; the load-bearing traversal is the deterministic aspect read, and the agentic loop works around it |
 
@@ -104,7 +104,7 @@ The agent runs on one always-on cloud VM behind Caddy TLS; the dashboard is on V
 - **Lineage (`datahub/emit/`)**: an SDK-emitted chain of the web_sessions table, features, model, deployment, and owners, into DataHub.
 - **Agent (`services/agent/`)**: a LangGraph state machine (Detect, Recall, Traverse, Root-Cause, Identify Owner, Propose Fix, Write-Back) with a human-approval interrupt, durable Postgres checkpointing, Langfuse tracing, and a split write-back.
 - **Dashboard (`apps/web/`)**: Next.js 16, a React Flow lineage graph, Apache ECharts drift charts, a streamed agent-reasoning panel, and the live model-page write-back reveal.
-- **Mobile (`apps/mobile/`)**: an Expo app that consumes the same SSE stream and approves the write-back from a phone.
+- **Mobile (`apps/mobile/`)**: a native Expo app on **iOS and Android** that consumes the same SSE stream and approves the write-back from a phone; both platforms are demonstrated, and the judge-installable artifact is the Android APK.
 
 ## The novelty, framed honestly
 
