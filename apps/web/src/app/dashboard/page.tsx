@@ -12,6 +12,7 @@ import {
   type Drift,
   type Lineage,
   type ModelCard,
+  type ProposedFix,
   type Scenario,
 } from "./lib";
 
@@ -66,6 +67,61 @@ function CalRow({ label, raw, cal }: { label: string; raw?: number; cal?: number
       <span className="tnum font-mono text-healthy">{cal?.toFixed(3) ?? "-"}</span>
       <span className="text-subtle">after isotonic calibration</span>
     </div>
+  );
+}
+
+function FixPanel({ fix }: { fix: ProposedFix }) {
+  const [tab, setTab] = useState<"dbt" | "great_expectations" | "sql">("dbt");
+  const [copied, setCopied] = useState(false);
+  const code = fix[tab];
+  const tabs: { k: "dbt" | "great_expectations" | "sql"; label: string }[] = [
+    { k: "dbt", label: "dbt" },
+    { k: "great_expectations", label: "GE" },
+    { k: "sql", label: "SQL" },
+  ];
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mt-4"
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-mono text-[10px] tracking-widest text-subtle">PROPOSED FIX</span>
+        <span className="font-mono text-[9px] text-subtle">metadata-aware code-gen</span>
+      </div>
+      <div className="rounded-card border border-accent/20 bg-surface-1 p-3">
+        <div className="text-[11px] leading-relaxed text-muted">{fix.summary}</div>
+        <div className="mt-2 flex items-center gap-1">
+          {tabs.map((t) => (
+            <button
+              key={t.k}
+              onClick={() => setTab(t.k)}
+              className={`rounded px-2 py-0.5 font-mono text-[9px] transition-colors ${
+                tab === t.k ? "bg-accent-soft text-accent" : "text-subtle hover:text-muted"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+          <button
+            onClick={() => {
+              navigator.clipboard?.writeText(code);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1200);
+            }}
+            className="ml-auto rounded px-2 py-0.5 font-mono text-[9px] text-subtle hover:text-muted"
+          >
+            {copied ? "copied" : "copy"}
+          </button>
+        </div>
+        <pre className="mt-2 max-h-52 overflow-auto rounded bg-bg p-2 font-mono text-[9px] leading-relaxed text-fg">
+          {code}
+        </pre>
+        {fix.needs.length > 0 && (
+          <div className="mt-1 font-mono text-[9px] text-subtle">requires: {fix.needs.join(", ")}</div>
+        )}
+      </div>
+    </motion.div>
   );
 }
 
@@ -346,6 +402,8 @@ export default function Dashboard() {
                 )}
               </AnimatePresence>
             </div>
+
+            {state.proposedFix && <FixPanel fix={state.proposedFix} />}
 
             {card?.reference && (
               <div className="mt-4">

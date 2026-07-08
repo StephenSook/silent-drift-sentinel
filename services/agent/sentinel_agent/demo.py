@@ -7,7 +7,20 @@ import asyncio
 import json
 from typing import Any
 
+from . import fixgen
+
 _TABLE = "urn:li:dataset:(urn:li:dataPlatform:snowflake,ecommerce.web_sessions,PROD)"
+
+_CAUSATION = {
+    "drifted_feature": "PageValues", "root_cause_urn": _TABLE,
+    "change_type": "null_default_regression",
+    "drift_metric": "roc_auc 0.808->0.7131 (label-free CBPE), drop 0.0949",
+    "model_owner": "urn:li:corpuser:jane.doe",
+    "table_owner": "urn:li:corpGroup:data-engineering",
+    "detected_at": "2026-07-07T22:23:47+00:00",
+}
+
+_FIX = fixgen.generate_fix(_CAUSATION, {"reference": {"min": 0, "max": 361}})
 
 _RCA = (
     "CBPE-estimated ROC AUC for online_shoppers_purchase_intent dropped from 0.808 to 0.713 "
@@ -31,27 +44,16 @@ def _recorded(model_urn: str) -> list[dict[str, Any]]:
         (0.4, "trace", {"node": "root_cause", "kind": "thinking", "message": "Synthesizing root-cause analysis over the catalog context"}),
         (1.4, "trace", {"node": "root_cause", "kind": "result", "message": _RCA}),
         (0.5, "trace", {"node": "identify_owner", "kind": "result", "message": "Owner to notify: urn:li:corpGroup:data-engineering"}),
-        (0.7, "awaiting_approval", {"thread_id": "demo", "causation": {
-            "drifted_feature": "PageValues", "root_cause_urn": _TABLE,
-            "change_type": "null_default_regression",
-            "drift_metric": "roc_auc 0.808->0.7131 (label-free CBPE), drop 0.0949",
-            "model_owner": "urn:li:corpuser:jane.doe",
-            "table_owner": "urn:li:corpGroup:data-engineering",
-            "detected_at": "2026-07-07T22:23:47+00:00",
-        }}),
-        (1.2, "trace", {"node": "write_back", "kind": "tool_call", "message": "Writing drift_causation property, drift-degraded tag, and RCA document on the model, plus an incident on the upstream table"}),
+        (0.6, "trace", {"node": "propose_fix", "kind": "tool_call", "message": f"Generating a data-quality guardrail for {_FIX['column']} in {_FIX['table']} ({_FIX['change_type']})"}),
+        (0.9, "trace", {"node": "propose_fix", "kind": "result", "message": f"Proposed fix: {_FIX['summary']}", "fix": _FIX}),
+        (0.7, "awaiting_approval", {"thread_id": "demo", "causation": _CAUSATION, "proposed_fix": _FIX}),
+        (1.2, "trace", {"node": "write_back", "kind": "tool_call", "message": "Writing drift_causation + proposed_fix properties, the drift-degraded tag, and the RCA onto the model, plus an incident on the upstream table"}),
         (1.0, "writeback", {
-            "causation": {
-                "drifted_feature": "PageValues", "root_cause_urn": _TABLE,
-                "change_type": "null_default_regression",
-                "drift_metric": "roc_auc 0.808->0.7131 (label-free CBPE), drop 0.0949",
-                "model_owner": "urn:li:corpuser:jane.doe",
-                "table_owner": "urn:li:corpGroup:data-engineering",
-                "detected_at": "2026-07-07T22:23:47+00:00",
-            },
-            "result": {k: {"status": "done"} for k in ("structured_property", "tag", "document", "incident", "slack")},
+            "causation": _CAUSATION,
+            "proposed_fix": _FIX,
+            "result": {k: {"status": "done"} for k in ("structured_property", "tag", "document", "proposed_fix", "incident", "slack")},
         }),
-        (0.4, "trace", {"node": "write_back", "kind": "tool_result", "message": "Wrote: structured_property=done, tag=done, document=done, incident=done. Notified data-engineering in Slack."}),
+        (0.4, "trace", {"node": "write_back", "kind": "tool_result", "message": "Wrote: structured_property=done, tag=done, document=done, proposed_fix=done, incident=done. Notified data-engineering in Slack."}),
     ]
 
 

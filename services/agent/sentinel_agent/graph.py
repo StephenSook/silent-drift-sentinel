@@ -14,6 +14,7 @@ def build_graph(checkpointer=None, interrupt_before_writeback: bool = False):
     g.add_node("traverse", nodes.traverse)
     g.add_node("root_cause", nodes.root_cause)
     g.add_node("identify_owner", nodes.identify_owner)
+    g.add_node("propose_fix", nodes.propose_fix)
     g.add_node("write_back", nodes.write_back)
 
     g.add_edge(START, "detect")
@@ -26,7 +27,8 @@ def build_graph(checkpointer=None, interrupt_before_writeback: bool = False):
     )
     g.add_edge("traverse", "root_cause")
     g.add_edge("root_cause", "identify_owner")
-    g.add_edge("identify_owner", "write_back")
+    g.add_edge("identify_owner", "propose_fix")
+    g.add_edge("propose_fix", "write_back")
     g.add_edge("write_back", END)
 
     compile_kwargs = {}

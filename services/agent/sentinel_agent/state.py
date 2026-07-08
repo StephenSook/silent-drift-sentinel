@@ -23,6 +23,9 @@ class DriftState(BaseModel):
     # root-cause synthesis (LLM, prose only)
     rca_narrative: str = ""
 
+    # metadata-aware code-gen: the data-quality guardrail generated from the diagnosis
+    proposed_fix: dict[str, Any] = Field(default_factory=dict)
+
     # write-back
     causation: dict[str, Any] = Field(default_factory=dict)
     writeback_result: dict[str, Any] = Field(default_factory=dict)

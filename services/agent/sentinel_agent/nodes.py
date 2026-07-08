@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from . import datahub_io, llm, writeback
+from . import datahub_io, fixgen, llm, writeback
 from .state import DriftState, event
 
 
@@ -77,14 +77,32 @@ def identify_owner(state: DriftState) -> dict[str, Any]:
     }
 
 
+def propose_fix(state: DriftState) -> dict[str, Any]:
+    # Metadata-aware code-gen: from the diagnosed change_type + the exact column and
+    # upstream table, generate the data-quality guardrail that would have caught this
+    # regression. Deterministic (template, not the LLM), so it stays out of the write path.
+    fix = fixgen.generate_fix(state.causation, state.drift_signal)
+    return {
+        "proposed_fix": fix,
+        "trace": [
+            event("propose_fix", "tool_call",
+                  f"Generating a data-quality guardrail for {fix['column']} in "
+                  f"{fix['table']} ({fix['change_type']})"),
+            event("propose_fix", "result", f"Proposed fix: {fix['summary']}", fix=fix),
+        ],
+    }
+
+
 def write_back(state: DriftState) -> dict[str, Any]:
     # Reached only after the human-in-the-loop interrupt is resumed. Deterministic:
     # writes the causation computed upstream, never anything the LLM produced live.
-    causation = state.causation
     trace = [event("write_back", "tool_call",
-                   "Writing drift_causation property, drift-degraded tag, and RCA document on "
-                   "the model, plus an incident on the upstream table")]
-    result = writeback.write_back(state.model_urn, causation, state.rca_narrative, state.source_table)
+                   "Writing drift_causation + proposed_fix properties, the drift-degraded tag, and "
+                   "the RCA onto the model, plus an incident on the upstream table")]
+    result = writeback.write_back(
+        state.model_urn, state.causation, state.rca_narrative, state.source_table,
+        proposed_fix=state.proposed_fix,
+    )
     summary = ", ".join(f"{k}={v.get('status')}" for k, v in result.items())
     trace.append(event("write_back", "tool_result", f"Wrote: {summary}"))
     return {"writeback_result": result, "trace": trace}

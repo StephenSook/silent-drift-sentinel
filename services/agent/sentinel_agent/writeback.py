@@ -18,6 +18,7 @@ from datahub.metadata.schema_classes import GlobalTagsClass, StructuredPropertie
 from . import config
 
 SP_URN = "urn:li:structuredProperty:io.sentinel.drift_causation"
+FIX_SP_URN = "urn:li:structuredProperty:io.sentinel.proposed_fix"
 
 
 def _slug(urn: str) -> str:
@@ -131,7 +132,7 @@ def reset_writeback(model_urn: str, table_urn: str = "") -> dict[str, Any]:
 
 
 def write_back(model_urn: str, causation: dict[str, Any], rca_narrative: str,
-               table_urn: str) -> dict[str, Any]:
+               table_urn: str, proposed_fix: dict[str, Any] | None = None) -> dict[str, Any]:
     key = _slug(model_urn)
     wal = _load_wal(key)
     wal["causation"] = causation
@@ -181,6 +182,20 @@ def write_back(model_urn: str, causation: dict[str, Any], rca_narrative: str,
                  % (json.dumps(rca_narrative), model_urn))
         return "rca-set-on-model-description"
 
+    def _fix():
+        # the generated data-quality guardrail (dbt test) written as a second typed
+        # property: the agent's metadata-aware code-gen, recorded on the model.
+        text = (proposed_fix or {}).get("dbt") or (proposed_fix or {}).get("summary") or ""
+        if not text:
+            return "no fix generated"
+        _graphql(
+            'mutation { upsertStructuredProperties(input: { assetUrn: "%s", '
+            'structuredPropertyInputParams: [{ structuredPropertyUrn: "%s", '
+            'values: [{ stringValue: %s }] }] }) { properties { structuredProperty { urn } } } }'
+            % (model_urn, FIX_SP_URN, json.dumps(text))
+        )
+        return "proposed-fix-written"
+
     def _incident():
         table_name = table_urn.split(",")[1] if "," in table_urn else table_urn
         q = (
@@ -225,6 +240,7 @@ def write_back(model_urn: str, causation: dict[str, Any], rca_narrative: str,
     results["structured_property"] = step("structured_property", _prop)
     results["tag"] = step("tag", _tag)
     results["document"] = step("document", _doc)
+    results["proposed_fix"] = step("proposed_fix", _fix)
     results["incident"] = step("incident", _incident)
     results["slack"] = {"status": "done", "result": _slack()}
     return results

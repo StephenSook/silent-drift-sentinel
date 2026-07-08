@@ -158,7 +158,8 @@ async def _live_stream(thread_id: str, scenario: str):
     snap = await _GRAPH.aget_state(cfg)
     if snap.next and "write_back" in snap.next:
         yield {"event": "awaiting_approval", "data": json.dumps(
-            {"thread_id": thread_id, "causation": snap.values.get("causation", {})}, default=str,
+            {"thread_id": thread_id, "causation": snap.values.get("causation", {}),
+             "proposed_fix": snap.values.get("proposed_fix", {})}, default=str,
         )}
     else:
         yield {"event": "done", "data": json.dumps({"ok": True})}

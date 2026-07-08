@@ -43,6 +43,19 @@ export type WriteBack = {
   result: Record<string, { status: string; result?: string }>;
 };
 
+/** The data-quality guardrail the agent generated from the diagnosis (metadata-aware
+ * code-gen): a paste-ready dbt test, Great Expectations expectation, and SQL guard. */
+export type ProposedFix = {
+  change_type: string;
+  column: string;
+  table: string;
+  summary: string;
+  dbt: string;
+  great_expectations: string;
+  sql: string;
+  needs: string[];
+};
+
 export type Scenario = "harmful" | "benign";
 
 export async function fetchLineage(scenario: Scenario = "harmful"): Promise<Lineage> {
@@ -82,7 +95,11 @@ export async function resetDemo(): Promise<void> {
   await fetch(`${AGENT_URL}/api/reset`, { method: "POST" });
 }
 
-export type Approval = { thread_id: string; causation: Record<string, string> };
+export type Approval = {
+  thread_id: string;
+  causation: Record<string, string>;
+  proposed_fix?: ProposedFix;
+};
 
 export type RunState = {
   status: "idle" | "running" | "awaiting" | "done";
@@ -94,6 +111,7 @@ export type RunState = {
   modelUrn?: string;
   verified?: CatalogProof;
   unreachable?: boolean;
+  proposedFix?: ProposedFix;
 };
 
 export function useAgentRun() {
@@ -117,7 +135,12 @@ export function useAgentRun() {
     es.addEventListener("awaiting_approval", (e) => {
       const a = JSON.parse((e as MessageEvent).data) as Approval;
       // the demo replay auto-proceeds; a live run waits for the human
-      setState((s) => ({ ...s, approval: a, status: s.demo ? "running" : "awaiting" }));
+      setState((s) => ({
+        ...s,
+        approval: a,
+        proposedFix: a.proposed_fix ?? s.proposedFix,
+        status: s.demo ? "running" : "awaiting",
+      }));
     });
     es.addEventListener("writeback", (e) => {
       const wb = JSON.parse((e as MessageEvent).data) as WriteBack;
