@@ -92,8 +92,8 @@ export default function Dashboard() {
   const awaiting = state.status === "awaiting" && !!state.approval;
 
   return (
-    <main className="flex h-screen flex-col overflow-hidden bg-bg">
-      <header className="flex items-center justify-between border-b border-border px-5 py-3">
+    <main className="flex min-h-screen flex-col bg-bg lg:h-screen lg:overflow-hidden">
+      <header className="flex flex-col items-start gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="flex items-center gap-3">
           <span className="relative flex h-2 w-2">
             <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${scenario === "harmful" ? "bg-degraded" : "bg-healthy"}`} />
@@ -102,7 +102,7 @@ export default function Dashboard() {
           <span className="font-mono text-xs tracking-[0.22em] text-muted">SILENT-DRIFT SENTINEL</span>
           <span className="font-mono text-[11px] text-subtle">/ online_shoppers_purchase_intent</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* scenario toggle: proof that drift is not always degradation */}
           <div className="mr-1 flex overflow-hidden rounded-md border border-border text-[11px] font-medium">
             <button
@@ -147,9 +147,9 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <div className="grid flex-1 grid-cols-[320px_1fr_380px] overflow-hidden">
+      <div className="grid flex-1 grid-cols-1 lg:grid-cols-[320px_1fr_380px] lg:overflow-hidden">
         {/* left: agent reasoning */}
-        <section className="flex flex-col overflow-hidden border-r border-border">
+        <section className="flex max-h-[46vh] flex-col overflow-hidden border-b border-border lg:max-h-none lg:border-b-0 lg:border-r">
           <div className="border-b border-border px-4 py-2 font-mono text-[10px] tracking-widest text-subtle">
             AGENT REASONING
           </div>
@@ -192,7 +192,7 @@ export default function Dashboard() {
         </section>
 
         {/* center: lineage */}
-        <section className="relative overflow-hidden">
+        <section className="relative h-[62vh] overflow-hidden lg:h-auto">
           {lineage ? <LineageGraph lineage={lineage} revealed={revealed} /> : <Empty label="loading lineage" />}
           <div className="pointer-events-none absolute left-4 top-3 font-mono text-[10px] tracking-widest text-subtle">
             DATAHUB ML LINEAGE
@@ -200,7 +200,7 @@ export default function Dashboard() {
         </section>
 
         {/* right: drift signal + model page reveal */}
-        <section className="flex flex-col overflow-hidden border-l border-border">
+        <section className="flex flex-col overflow-hidden border-t border-border lg:border-l lg:border-t-0">
           <div className="border-b border-border p-3">
             <div className="mb-2 font-mono text-[10px] tracking-widest text-subtle">DRIFT SIGNAL</div>
             {drift ? (

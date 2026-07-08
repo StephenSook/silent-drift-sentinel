@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans, IBM_Plex_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
+import ServiceWorker from "./ServiceWorker";
 
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
@@ -39,6 +40,14 @@ export const metadata: Metadata = {
     description: DESC,
     images: ["/og.png"],
   },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Sentinel" },
+  icons: { icon: "/icon-512.png", apple: "/icon-512.png" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0c0d10",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -51,7 +60,10 @@ export default function RootLayout({
       lang="en"
       className={`${plexSans.variable} ${plexMono.variable} ${instrument.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <ServiceWorker />
+        {children}
+      </body>
     </html>
   );
 }
