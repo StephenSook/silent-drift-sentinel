@@ -3,6 +3,13 @@
 import { useCallback, useRef, useState } from "react";
 
 export const AGENT_URL = process.env.NEXT_PUBLIC_AGENT_URL ?? "http://localhost:8130";
+export const DATAHUB_URL =
+  process.env.NEXT_PUBLIC_DATAHUB_URL ?? "https://datahub.16-59-185-192.nip.io";
+
+/** Deep-link to the real DataHub entity page for a URN. */
+export function datahubEntityUrl(urn: string): string {
+  return `${DATAHUB_URL}/entity/${encodeURIComponent(urn)}`;
+}
 
 export type TraceEvent = { node: string; kind: string; message: string };
 
@@ -58,6 +65,23 @@ export async function fetchModelCard(): Promise<ModelCard> {
   return r.json();
 }
 
+/** The drift_causation property re-fetched FROM DataHub: proof the write-back
+ * landed on the real catalog, not just what the agent claimed. */
+export type CatalogProof = {
+  present: boolean;
+  causation?: { property_urn: string; value: string; tag_present: boolean; source: string };
+};
+export async function verifyCatalog(): Promise<CatalogProof> {
+  const r = await fetch(`${AGENT_URL}/api/verify`);
+  if (!r.ok) throw new Error(`verify ${r.status}`);
+  return r.json();
+}
+
+/** Return the model to a pristine state so the live demo re-runs cleanly. */
+export async function resetDemo(): Promise<void> {
+  await fetch(`${AGENT_URL}/api/reset`, { method: "POST" });
+}
+
 export type Approval = { thread_id: string; causation: Record<string, string> };
 
 export type RunState = {
@@ -67,6 +91,9 @@ export type RunState = {
   activeNode?: string;
   approval?: Approval;
   demo?: boolean;
+  modelUrn?: string;
+  verified?: CatalogProof;
+  unreachable?: boolean;
 };
 
 export function useAgentRun() {
@@ -79,6 +106,10 @@ export function useAgentRun() {
     const es = new EventSource(`${AGENT_URL}/api/stream?demo_mode=${demo}&scenario=${scenario}`);
     esRef.current = es;
 
+    es.addEventListener("start", (e) => {
+      const d = JSON.parse((e as MessageEvent).data) as { model_urn?: string };
+      setState((s) => ({ ...s, modelUrn: d.model_urn }));
+    });
     es.addEventListener("trace", (e) => {
       const ev = JSON.parse((e as MessageEvent).data) as TraceEvent;
       setState((s) => ({ ...s, trace: [...s.trace, ev], activeNode: ev.node }));
@@ -98,8 +129,15 @@ export function useAgentRun() {
     });
     es.onerror = () => {
       es.close();
-      // a live run closes the stream at the approval gate; preserve that state
-      setState((s) => (s.status === "running" ? { ...s, status: "done" } : s));
+      setState((s) => {
+        // no trace at all means the agent is unreachable (cold VM / down), not a
+        // normal at-gate close; surface it instead of spinning forever
+        if (s.status === "running" && s.trace.length === 0) {
+          return { ...s, status: "idle", unreachable: true };
+        }
+        // a live run closes the stream at the approval gate; preserve that state
+        return s.status === "running" ? { ...s, status: "done" } : s;
+      });
     };
   }, []);
 
@@ -113,7 +151,18 @@ export function useAgentRun() {
       writeback: data.writeback ?? s.writeback,
       status: "done",
     }));
+    // re-fetch the property FROM DataHub as independent proof it landed
+    const proof = await verifyCatalog().catch(() => undefined);
+    if (proof) setState((s) => ({ ...s, verified: proof }));
   }, []);
 
-  return { state, run, approve };
+  // reset run state (used on scenario toggle and the Reset-demo button); when
+  // clearCatalog, also wipe the write-back from DataHub so a re-run re-animates.
+  const reset = useCallback((clearCatalog = false) => {
+    esRef.current?.close();
+    setState({ status: "idle", trace: [] });
+    if (clearCatalog) resetDemo().catch(() => {});
+  }, []);
+
+  return { state, run, approve, reset };
 }

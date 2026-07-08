@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { AnimatePresence, motion } from "motion/react";
 import {
+  datahubEntityUrl,
   fetchDrift,
   fetchLineage,
   fetchModelCard,
@@ -69,7 +70,7 @@ function CalRow({ label, raw, cal }: { label: string; raw?: number; cal?: number
 }
 
 export default function Dashboard() {
-  const { state, run, approve } = useAgentRun();
+  const { state, run, approve, reset } = useAgentRun();
   const [scenario, setScenario] = useState<Scenario>("harmful");
   const [lineage, setLineage] = useState<Lineage | null>(null);
   const [drift, setDrift] = useState<Drift | null>(null);
@@ -79,6 +80,12 @@ export default function Dashboard() {
     fetchLineage(scenario).then(setLineage).catch(() => {});
     fetchDrift(scenario).then(setDrift).catch(() => {});
   }, [scenario]);
+
+  // clear any stale write-back when the scenario changes, so the benign screen
+  // never contradicts a leftover harmful write-back (or vice versa)
+  useEffect(() => {
+    reset();
+  }, [scenario, reset]);
 
   useEffect(() => {
     fetchModelCard().then(setCard).catch(() => {});
@@ -150,6 +157,16 @@ export default function Dashboard() {
           >
             Demo
           </button>
+          {(state.writeback || state.status === "done") && (
+            <button
+              onClick={() => reset(true)}
+              disabled={busy}
+              title="Clear the write-back from DataHub so the demo re-runs from a pristine model"
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-subtle transition-colors hover:border-border-strong hover:text-muted disabled:opacity-40"
+            >
+              Reset
+            </button>
+          )}
         </div>
       </header>
 
@@ -160,10 +177,16 @@ export default function Dashboard() {
             AGENT REASONING
           </div>
           <div ref={traceRef} className="flex-1 space-y-2 overflow-y-auto p-3">
-            {state.trace.length === 0 && (
+            {state.trace.length === 0 && !state.unreachable && (
               <div className="text-xs leading-relaxed text-subtle">
                 Run the agent to watch it detect the drift, walk DataHub lineage to the upstream
                 table, reason about the cause, and write the finding back onto the model.
+              </div>
+            )}
+            {state.unreachable && (
+              <div className="rounded-md border border-degraded/40 bg-degraded-soft/40 p-2 text-xs leading-relaxed text-degraded">
+                The agent did not respond. The always-on host may be waking up. Wait a moment, then
+                run again.
               </div>
             )}
             <AnimatePresence initial={false}>
@@ -250,6 +273,17 @@ export default function Dashboard() {
                 </AnimatePresence>
               </div>
 
+              {state.modelUrn && (
+                <a
+                  href={datahubEntityUrl(state.modelUrn)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 inline-block font-mono text-[10px] text-accent hover:underline"
+                >
+                  View on DataHub &#8599;
+                </a>
+              )}
+
               <AnimatePresence>
                 {wb ? (
                   <motion.div
@@ -280,10 +314,28 @@ export default function Dashboard() {
                         RCA DOC + INCIDENT + SLACK
                       </div>
                       <div className="mt-1 text-[11px] leading-relaxed text-muted">
-                        Root-cause analysis attached to the model. An incident was raised on the
-                        upstream web_sessions table, and the owning team was notified in Slack.
+                        Root-cause analysis written to the model description. An incident was raised
+                        on the upstream web_sessions table, and the owning team was notified in Slack.
                       </div>
                     </motion.div>
+                    {state.verified?.present && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.32 }}
+                        className="rounded-md border border-healthy/40 bg-healthy-soft/40 p-2"
+                      >
+                        <div className="font-mono text-[9px] tracking-widest text-healthy">
+                          VERIFIED FROM DATAHUB
+                        </div>
+                        <div className="mt-1 break-all font-mono text-[9px] leading-relaxed text-fg">
+                          {state.verified.causation?.value}
+                        </div>
+                        <div className="mt-1 text-[9px] text-subtle">
+                          Re-fetched from the catalog after the write, not the agent&apos;s claim.
+                        </div>
+                      </motion.div>
+                    )}
                   </motion.div>
                 ) : (
                   <div className="mt-3 text-xs text-subtle">
