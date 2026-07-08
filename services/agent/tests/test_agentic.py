@@ -25,7 +25,7 @@ def test_single_synthesis_when_flag_off(monkeypatch):
     monkeypatch.setattr(config, "AGENTIC_RCA", False)
     monkeypatch.setattr(datahub_io, "gather_ack_context",
                         lambda m, t: ({}, [{"tool": "get_entities", "summary": "read owner"}]))
-    monkeypatch.setattr(llm, "synthesize_rca", lambda s, l, ack_context=None: "SYNTH RCA")
+    monkeypatch.setattr(llm, "synthesize_rca", lambda s, lin, ack_context=None: "SYNTH RCA")
     monkeypatch.setattr(llm, "agentic_rca", _boom)  # must not run when the flag is off
     out = nodes.root_cause(_state())
     assert out["rca_narrative"] == "SYNTH RCA"
@@ -37,7 +37,7 @@ def test_agentic_loop_used_when_flag_on(monkeypatch):
     monkeypatch.setattr(datahub_io, "agent_context_tools", lambda: ["t"])
     monkeypatch.setattr(
         llm, "agentic_rca",
-        lambda s, l, tools, m, st: ("AGENTIC RCA",
+        lambda s, lin, tools, m, st: ("AGENTIC RCA",
                                     [{"tool": "get_lineage", "summary": "walked lineage (11 upstream assets)"}]),
     )
     monkeypatch.setattr(llm, "synthesize_rca", _boom)  # must not fall back on success
@@ -56,7 +56,7 @@ def test_agentic_failure_falls_back_to_synthesis(monkeypatch):
     monkeypatch.setattr(llm, "agentic_rca", raises)
     monkeypatch.setattr(datahub_io, "gather_ack_context",
                         lambda m, t: ({}, [{"tool": "get_entities", "summary": "read owner"}]))
-    monkeypatch.setattr(llm, "synthesize_rca", lambda s, l, ack_context=None: "FALLBACK RCA")
+    monkeypatch.setattr(llm, "synthesize_rca", lambda s, lin, ack_context=None: "FALLBACK RCA")
     out = nodes.root_cause(_state())
     assert out["rca_narrative"] == "FALLBACK RCA"
 
