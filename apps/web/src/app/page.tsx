@@ -58,7 +58,7 @@ export default function Home() {
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
-          style={{ background: "radial-gradient(90% 75% at 50% 42%, transparent, oklch(0.14 0.006 264 / 0.5) 80%, var(--color-bg) 100%)" }}
+          style={{ background: "radial-gradient(42% 34% at 50% 45%, oklch(0.1 0.006 264 / 0.62), transparent 60%), radial-gradient(92% 78% at 50% 42%, transparent, oklch(0.13 0.006 264 / 0.5) 82%, var(--color-bg) 100%)" }}
         />
         <div data-hero-content className="relative z-10 flex w-full max-w-3xl flex-col items-center text-center">
           <motion.div
