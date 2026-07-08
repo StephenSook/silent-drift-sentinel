@@ -6,10 +6,12 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   datahubEntityUrl,
   fetchDrift,
+  fetchEval,
   fetchLineage,
   fetchModelCard,
   useAgentRun,
   type Drift,
+  type EvalReport,
   type Lineage,
   type ModelCard,
   type ProposedFix,
@@ -131,6 +133,7 @@ export default function Dashboard() {
   const [lineage, setLineage] = useState<Lineage | null>(null);
   const [drift, setDrift] = useState<Drift | null>(null);
   const [card, setCard] = useState<ModelCard | null>(null);
+  const [evalr, setEvalr] = useState<EvalReport | null>(null);
 
   useEffect(() => {
     fetchLineage(scenario).then(setLineage).catch(() => {});
@@ -145,6 +148,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchModelCard().then(setCard).catch(() => {});
+    fetchEval().then(setEvalr).catch(() => {});
   }, []);
 
   // the reasoning panel follows the stream
@@ -456,6 +460,27 @@ export default function Dashboard() {
                     LightGBM, {card.n_features} features, best iteration {card.best_iteration}. Honest
                     temporal split: {card.split_sizes?.train_fit} train / {card.split_sizes?.calib} calib
                     / {card.split_sizes?.reference} reference / {card.split_sizes?.production} production.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {evalr?.alarm && (
+              <div className="mt-4">
+                <div className="mb-2 font-mono text-[10px] tracking-widest text-subtle">DETECTOR EVAL</div>
+                <div className="space-y-2 rounded-card border border-border bg-surface-1 p-3">
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <Metric label="ALARM PREC" value={evalr.alarm.precision} />
+                    <Metric label="ALARM RECALL" value={evalr.alarm.recall} />
+                    <Metric label="LOCALIZE" value={evalr.localization_accuracy} />
+                  </div>
+                  <div className="border-t border-border pt-2 text-[10px] leading-relaxed text-subtle">
+                    Over {evalr.n_scenarios} labeled scenarios (null/default, unit rescale, default
+                    value, benign shift): no false alarms and no misses (fp {evalr.alarm.fp}, fn{" "}
+                    {evalr.alarm.fn}), root cause localized {evalr.localization_n}/{evalr.localization_n},
+                    change type classified{" "}
+                    {evalr.change_type_accuracy != null ? Math.round(evalr.change_type_accuracy * 100) : "-"}%
+                    correct. Measured, not asserted.
                   </div>
                 </div>
               </div>

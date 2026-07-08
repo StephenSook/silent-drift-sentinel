@@ -78,6 +78,21 @@ export async function fetchModelCard(): Promise<ModelCard> {
   return r.json();
 }
 
+/** The detector's evaluation over a labeled scenario suite: proof the root-cause
+ * localization is measured, not just asserted. */
+export type EvalReport = {
+  n_scenarios?: number;
+  alarm?: { precision: number; recall: number; accuracy: number; tp: number; fp: number; tn: number; fn: number };
+  localization_accuracy?: number;
+  localization_n?: number;
+  change_type_accuracy?: number;
+  change_type_n?: number;
+};
+export async function fetchEval(): Promise<EvalReport> {
+  const r = await fetch(`${AGENT_URL}/api/eval`);
+  return r.json();
+}
+
 /** The drift_causation property re-fetched FROM DataHub: proof the write-back
  * landed on the real catalog, not just what the agent claimed. */
 export type CatalogProof = {

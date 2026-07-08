@@ -36,6 +36,15 @@ def test_injections():
     assert DR.inject_null_regression(df, "PageValues", 0.0)["PageValues"].tolist() == [0, 0, 0]
 
 
+def test_inject_default_value_makes_one_value_dominate():
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({"PageValues": rng.uniform(1, 100, 400)})
+    out = DR.inject_default_value(df, "PageValues", frac=0.95, value=7.0)
+    share = out["PageValues"].value_counts(normalize=True).iloc[0]
+    assert share > 0.9  # a single default dominates
+    assert out["PageValues"].nunique() > 1  # but it is not a full collapse to a constant
+
+
 def test_per_feature_drift_flags_shifted_feature():
     rng = np.random.default_rng(42)
     target = DR.NUMERIC[0]

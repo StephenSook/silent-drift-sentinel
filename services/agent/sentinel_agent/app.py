@@ -136,6 +136,15 @@ def model_card() -> dict:
     return json.loads(p.read_text()) if p.exists() else {}
 
 
+@app.get("/api/eval")
+def eval_report() -> dict:
+    """The drift detector's evaluation over a labeled scenario suite: alarm
+    precision/recall, root-cause localization, and change-type accuracy. Turns
+    'it finds the root cause' into a measured number for the judges."""
+    p = config.ARTIFACTS_DIR / "eval_report.json"
+    return json.loads(p.read_text()) if p.exists() else {}
+
+
 @app.get("/api/verify")
 def verify() -> dict:
     """Live proof: re-fetch the drift_causation property back FROM DataHub so the UI

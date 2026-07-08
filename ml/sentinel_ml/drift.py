@@ -90,6 +90,22 @@ def inject_benign(df: pd.DataFrame, col: str, shift_std: float = 1.5) -> pd.Data
     return out
 
 
+def inject_default_value(df: pd.DataFrame, col: str = "PageValues", frac: float = 0.95,
+                         value: float | None = None, seed: int = 0) -> pd.DataFrame:
+    """Overwrite a fraction of rows with a single dominant default (a stuck default
+    fill upstream), leaving a real minority. One value dominates while cardinality
+    stays above one: the default_value_regression signature (distinct from a full
+    collapse to a constant, which is null_default_regression)."""
+    out = df.copy()
+    rng = np.random.default_rng(seed)
+    mask = rng.random(len(out)) < frac
+    if value is None:
+        nz = out[col][out[col] > 0]
+        value = float(nz.median()) if len(nz) else 1.0
+    out.loc[mask, col] = float(value)
+    return out
+
+
 # ---- Layer 1: CBPE ----------------------------------------------------------
 def _metric_value(res, metric: str) -> float | None:
     df = res.to_df()
