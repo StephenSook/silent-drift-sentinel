@@ -18,10 +18,27 @@ const instrument = Instrument_Serif({
   weight: ["400"],
 });
 
+const DESC =
+  "An on-call AI agent that detects ML model drift, walks DataHub lineage to the upstream root cause, and writes a drift-causation object back onto the model.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL("https://silent-drift-sentinel-web.vercel.app"),
   title: "Silent-Drift Sentinel",
-  description:
-    "An on-call AI agent that detects ML model drift, walks DataHub lineage to the upstream root cause, and writes a drift-causation object back onto the model.",
+  description: DESC,
+  openGraph: {
+    title: "Silent-Drift Sentinel",
+    description: DESC,
+    url: "https://silent-drift-sentinel-web.vercel.app",
+    siteName: "Silent-Drift Sentinel",
+    images: [{ url: "/og.png", width: 1200, height: 630 }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Silent-Drift Sentinel",
+    description: DESC,
+    images: ["/og.png"],
+  },
 };
 
 export default function RootLayout({
