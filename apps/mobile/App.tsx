@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  LogBox,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -12,6 +13,9 @@ import {
 import EventSource from "react-native-sse";
 
 const AGENT_URL = "https://agent.16-59-185-192.nip.io";
+
+// suppress dev warning toasts (e.g. SafeAreaView deprecation) for clean demo recordings
+LogBox.ignoreAllLogs();
 
 type Trace = { node: string; kind: string; message: string };
 type Causation = Record<string, string>;
