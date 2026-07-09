@@ -1,0 +1,44 @@
+name: uptime
+
+# Judging-window uptime watchdog. GitHub-hosted runners can reach external URLs (a
+# claude.ai cloud routine cannot: its egress gateway 403s outbound CONNECT). When a
+# surface is down this job fails, and GitHub emails the repo owner on a failed run.
+# Offset minutes because GitHub deprioritizes contended schedules (*/N and :00), so a
+# nominal cadence can silently fire late (see the playbook HR52).
+
+on:
+  schedule:
+    - cron: "9,39 * * * *" # ~every 30 min, offset off :00
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping live surfaces
+        run: |
+          fail=0
+          ping() { curl -sS -L -m 25 -o /tmp/b -w "%{http_code}" "$1" 2>/dev/null || echo 000; }
+          for pair in \
+            "web-dashboard|https://silent-drift-sentinel-web.vercel.app/dashboard" \
+            "landing|https://silent-drift-sentinel-web.vercel.app/" \
+            "datahub|https://datahub.16-59-185-192.nip.io"; do
+            name=${pair%%|*}; url=${pair#*|}
+            code=$(ping "$url")
+            echo "$name: HTTP $code"
+            [ "$code" = "200" ] || { echo "::error::$name is DOWN (HTTP $code)"; fail=1; }
+          done
+          hcode=$(ping "https://agent.16-59-185-192.nip.io/health")
+          hbody=$(cat /tmp/b 2>/dev/null)
+          echo "agent-health: HTTP $hcode $hbody"
+          if [ "$hcode" != "200" ] || ! printf '%s' "$hbody" | grep -q ok; then
+            echo "::error::agent-health is DOWN (HTTP $hcode, body: $hbody)"; fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then
+            echo "One or more Silent-Drift Sentinel surfaces are DOWN. SSH the AWS VM, restart the sentinel-agent service and the DataHub docker containers, then confirm /health returns ok."
+            exit 1
+          fi
+          echo "ALL GREEN"
