@@ -20,7 +20,11 @@ DataHub is not a backdrop here. It is the graph the agent reasons over, the auth
 | Dashboard | https://silent-drift-sentinel-web.vercel.app/dashboard |
 | Agent API | https://agent.16-59-185-192.nip.io |
 | DataHub catalog | https://datahub.16-59-185-192.nip.io (login `datahub` / `datahub`) |
-| Android app (APK) | https://expo.dev/artifacts/eas/-uhHvOHQvSCos-1-f4pH2aZRjeNfmDTluLNoncoABmU.apk |
+| Android app (APK) | https://github.com/StephenSook/silent-drift-sentinel/releases/download/v1.0.0/silent-drift-sentinel.apk |
+
+Phone install: scan the QR below (or grab the APK from the [v1.0.0 release](https://github.com/StephenSook/silent-drift-sentinel/releases/tag/v1.0.0)), open it on any Android device, and accept the unknown-source prompt. The app is the on-call experience wired to the same live agent.
+
+<img src="docs/qr-android-apk.png" width="150" alt="QR code that downloads the Android APK" />
 
 Open the dashboard, press **Run agent (live)**, approve the write-back, then click **Run again (recall)**. You will watch the agent detect the drop, walk the lineage to the upstream table, reason about the cause, write the `drift_causation` object onto the real model page (with a matching incident on the upstream dataset), and on the second run recognize its own recorded finding and stop. Flip the **Agentic** toggle to watch Claude drive the catalog reads itself in a live tool-calling loop. A **Demo** button replays a recorded run identically, over the same code path, as a safety take.
 
