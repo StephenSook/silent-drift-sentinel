@@ -176,7 +176,7 @@ DATAHUB_GMS_URL=http://localhost:8080 python services/agent/scripts/run_once.py
 pnpm -C apps/web install && NEXT_PUBLIC_AGENT_URL=http://localhost:8130 pnpm -C apps/web dev
 ```
 
-Sample outputs live in `examples/`. Tests: `pytest ml/tests services/agent/tests` and `pnpm -C apps/web test:e2e`.
+Sample outputs live in `examples/`. Tests: install the dev extras first (`uv pip install -e "ml[dev]" -e "services/agent[dev]"`), then `pytest ml/tests services/agent/tests` and `pnpm -C apps/web test:e2e`.
 
 ## Open-source contributions to DataHub
 
