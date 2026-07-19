@@ -9,7 +9,10 @@
     "backgroundColor": "#0c0d10",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.stephensook.silentdriftsentinel"
+      "bundleIdentifier": "com.stephensook.silentdriftsentinel",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.stephensook.silentdriftsentinel",
