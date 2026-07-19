@@ -21,10 +21,13 @@ DataHub is not a backdrop here. It is the graph the agent reasons over, the auth
 | Agent API | https://agent.16-59-185-192.nip.io |
 | DataHub catalog | https://datahub.16-59-185-192.nip.io (login `datahub` / `datahub`) |
 | Android app (APK) | https://github.com/StephenSook/silent-drift-sentinel/releases/download/v1.0.0/silent-drift-sentinel.apk |
+| iOS app (TestFlight) | https://testflight.apple.com/join/2qvqcRr9 (in Apple beta review; installs the moment it clears) |
 
-Phone install: scan the QR below (or grab the APK from the [v1.0.0 release](https://github.com/StephenSook/silent-drift-sentinel/releases/tag/v1.0.0)), open it on any Android device, and accept the unknown-source prompt. The app is the on-call experience wired to the same live agent.
+Phone install: scan a QR below. Android downloads the APK from the [v1.0.0 release](https://github.com/StephenSook/silent-drift-sentinel/releases/tag/v1.0.0) (accept the unknown-source prompt). iOS opens the TestFlight beta. Both are the on-call experience wired to the same live agent.
 
-<img src="docs/qr-android-apk.png" width="150" alt="QR code that downloads the Android APK" />
+| Android (APK) | iOS (TestFlight) |
+|---|---|
+| <img src="docs/qr-android-apk.png" width="150" alt="QR code that downloads the Android APK" /> | <img src="docs/qr-ios-testflight.png" width="150" alt="QR code that opens the iOS TestFlight beta" /> |
 
 Open the dashboard, press **Run agent (live)**, approve the write-back, then click **Run again (recall)**. You will watch the agent detect the drop, walk the lineage to the upstream table, reason about the cause, write the `drift_causation` object onto the real model page (with a matching incident on the upstream dataset), and on the second run recognize its own recorded finding and stop. Flip the **Agentic** toggle to watch Claude drive the catalog reads itself in a live tool-calling loop. A **Demo** button replays a recorded run identically, over the same code path, as a safety take.
 
@@ -60,7 +63,7 @@ Everything below runs live against a real hosted DataHub, on real data, with no 
 | Tracing | **WIRED LIVE** | Langfuse traces of the LangGraph run (optional keys) |
 | Owner notification | **WIRED LIVE** | Slack incoming webhook on write-back |
 | Cross-provider fallback | **WIRED LIVE** | LiteLLM falls back to Gemini if the primary model errors |
-| Web + mobile | **WIRED LIVE** | Next.js 16 dashboard on Vercel + a native Expo on-call app on **iOS and Android** (installable Android APK), wired to the same agent |
+| Web + mobile | **WIRED LIVE** | Next.js 16 dashboard on Vercel + a native Expo on-call app on **iOS and Android** (installable Android APK + iOS TestFlight), wired to the same agent |
 | Monitored model | **REAL, SDK-EMITTED** | A real calibrated LightGBM, emitted into the catalog as an `mlModel` on the MLflow platform via the DataHub Python SDK (no separate running MLflow server) |
 | ACK `get_lineage` via search index | **PARTIAL, BY DESIGN** | Returns 0 upstream via the async graph index on a fresh catalog; the load-bearing traversal is the deterministic aspect read, and the agentic loop works around it |
 
@@ -108,7 +111,7 @@ The agent runs on one always-on cloud VM behind Caddy TLS; the dashboard is on V
 - **Lineage (`datahub/emit/`)**: an SDK-emitted chain of the web_sessions table, features, model, deployment, and owners, into DataHub.
 - **Agent (`services/agent/`)**: a LangGraph state machine (Detect, Recall, Traverse, Root-Cause, Identify Owner, Propose Fix, Write-Back) with a human-approval interrupt, durable Postgres checkpointing, Langfuse tracing, and a split write-back.
 - **Dashboard (`apps/web/`)**: Next.js 16, a React Flow lineage graph, Apache ECharts drift charts, a streamed agent-reasoning panel, and the live model-page write-back reveal.
-- **Mobile (`apps/mobile/`)**: a native Expo app on **iOS and Android** that consumes the same SSE stream and approves the write-back from a phone; both platforms are demonstrated, and the judge-installable artifact is the Android APK.
+- **Mobile (`apps/mobile/`)**: a native Expo app on **iOS and Android** that consumes the same SSE stream and approves the write-back from a phone; both platforms are demonstrated, and both are judge-installable (Android APK release + iOS TestFlight).
 
 ## The novelty, framed honestly
 
