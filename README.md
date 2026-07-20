@@ -21,7 +21,7 @@ DataHub is not a backdrop here. It is the graph the agent reasons over, the auth
 | Agent API | https://agent.16-59-185-192.nip.io |
 | DataHub catalog | https://datahub.16-59-185-192.nip.io (login `datahub` / `datahub`) |
 | Android app (APK) | https://github.com/StephenSook/silent-drift-sentinel/releases/download/v1.0.0/silent-drift-sentinel.apk |
-| iOS app (TestFlight) | https://testflight.apple.com/join/2qvqcRr9 (in Apple beta review; installs the moment it clears) |
+| iOS app (TestFlight) | https://testflight.apple.com/join/2qvqcRr9 (installs on any iPhone) |
 
 Phone install: scan a QR below. Android downloads the APK from the [v1.0.0 release](https://github.com/StephenSook/silent-drift-sentinel/releases/tag/v1.0.0) (accept the unknown-source prompt). iOS opens the TestFlight beta. Both are the on-call experience wired to the same live agent.
 
