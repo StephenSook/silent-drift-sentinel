@@ -118,6 +118,17 @@ def agent_context_tools():
     return build_langchain_tools(client, include_mutations=False)
 
 
+def _tool_error(out: Any) -> str | None:
+    """Short description of an in-band tool error, or None if the read succeeded.
+    ACK's read tools return `{"error": ...}` (or a list of those, one per requested
+    urn) instead of raising when the GMS call fails."""
+    items = out if isinstance(out, list) else [out]
+    for item in items:
+        if isinstance(item, dict) and item.get("error"):
+            return str(item["error"]).strip().split("\n")[0][:120]
+    return None
+
+
 def gather_ack_context(model_urn: str, table_urn: str) -> tuple[dict[str, Any], list[dict[str, str]]]:
     """Read DataHub THROUGH the Agent Context Kit tools (get_entities, get_lineage),
     returning the gathered context plus a log of the ACK calls. This is the agent
@@ -132,8 +143,14 @@ def gather_ack_context(model_urn: str, table_urn: str) -> tuple[dict[str, Any], 
             return None
         try:
             out = tool.invoke(payload)
-            log.append({"tool": name, "summary": summary})
-            return out
+            # ACK tools do not always raise. A read that fails server-side (for example
+            # a search-index query while the index is rebuilding) comes back as a normal
+            # return value carrying an "error" key. Reporting that as a success would put
+            # a false "fetched ..." line in the trace the user is watching.
+            failure = _tool_error(out)
+            log.append({"tool": name,
+                        "summary": f"read failed: {failure}" if failure else summary})
+            return None if failure else out
         except Exception as e:  # noqa: BLE001
             log.append({"tool": name, "summary": f"error: {type(e).__name__}"})
             return None
