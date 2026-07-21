@@ -41,7 +41,7 @@ The Sentinel closes that gap as a single agent run, gated by a human, that ends 
 
 ## Sentinel in one loop
 
-> A production model quietly loses accuracy. The detector estimates the drop **label-free** with NannyML CBPE, so it fires before ground-truth labels arrive. The agent walks the model's DataHub lineage through the Agent Context Kit to the upstream table, localizes the drifted column, and reads the owning team from catalog metadata. Claude writes the root-cause narrative (and never touches the write path). From the diagnosed change type the agent generates the exact data-quality guardrail that would have caught it (a dbt test, a Great Expectations expectation, a SQL guard). A human approves. Deterministic code then writes a typed `drift_causation` property, a `proposed_fix` property, a `drift-degraded` tag, and the RCA onto the model, raises an incident on the upstream dataset, and pings the owning team in Slack. Run it again and the agent reads the finding it already wrote, recognizes the known cause, and stops: no re-diagnosis, no duplicate incident. The next on-call agent inherited the knowledge straight from the catalog.
+> A production model quietly loses accuracy. The detector estimates the drop **label-free** with NannyML CBPE, so it fires before ground-truth labels arrive. The agent walks the model's DataHub lineage to the upstream table, localizes the drifted column, and reads the owning team from catalog metadata, gathering its context through the DataHub Agent Context Kit. Claude writes the root-cause narrative (and never touches the write path). From the diagnosed change type the agent generates the exact data-quality guardrail that would have caught it (a dbt test, a Great Expectations expectation, a SQL guard). A human approves. Deterministic code then writes a typed `drift_causation` property, a `proposed_fix` property, a `drift-degraded` tag, and the RCA onto the model, raises an incident on the upstream dataset, and pings the owning team in Slack. Run it again and the agent reads the finding it already wrote, recognizes the known cause, and stops: no re-diagnosis, no duplicate incident. The next on-call agent inherited the knowledge straight from the catalog.
 
 ## What is real (capability honesty)
 
@@ -51,7 +51,7 @@ Everything below runs live against a real hosted DataHub, on real data, with no 
 |---|---|---|
 | Drift detection | **WIRED LIVE** | NannyML CBPE label-free performance estimate + per-feature KS/Chi-squared with Benjamini-Hochberg FDR + PCA reconstruction + data-quality fingerprint |
 | Root-cause lineage traversal | **WIRED LIVE** | Deterministic DataHub aspect reads: model to feature to source table to owner |
-| Agentic root-cause loop | **WIRED LIVE (opt-in)** | Claude drives ACK-style read tools (`get_entities`, `get_lineage`), implemented over the DataHub Python SDK, in a bounded, live-streamed tool-calling loop; falls back to a single synthesis on any error |
+| Agentic root-cause loop | **WIRED LIVE (opt-in)** | Claude drives real Agent Context Kit tools (`get_entities`, `get_lineage`) in a bounded, live-streamed tool-calling loop; falls back to a single synthesis on any error |
 | Metadata-aware code-gen | **WIRED LIVE** | From the change-type taxonomy, generates a dbt test + Great Expectations expectation + SQL guard, written back as a typed property |
 | Write-back (split) | **WIRED LIVE** | `drift_causation` + `proposed_fix` structured properties, `drift-degraded` tag, and RCA on the mlModel; incident on the upstream dataset (incidents cannot target an mlModel) |
 | Close-the-loop recall | **WIRED LIVE** | A re-run reads its own `drift_causation` from the catalog and short-circuits |
@@ -65,7 +65,8 @@ Everything below runs live against a real hosted DataHub, on real data, with no 
 | Cross-provider fallback | **WIRED LIVE** | LiteLLM falls back to Gemini if the primary model errors |
 | Web + mobile | **WIRED LIVE** | Next.js 16 dashboard on Vercel + a native Expo on-call app on **iOS and Android** (installable Android APK + iOS TestFlight), wired to the same agent |
 | Monitored model | **REAL, SDK-EMITTED** | A real calibrated LightGBM, emitted into the catalog as an `mlModel` on the MLflow platform via the DataHub Python SDK (no separate running MLflow server) |
-| ACK `get_lineage` via search index | **PARTIAL, BY DESIGN** | Returns 0 upstream via the async graph index on a fresh catalog; the load-bearing traversal is the deterministic aspect read, and the agentic loop works around it |
+| Agent Context Kit | **WIRED LIVE** | The real `datahub-agent-context` package with its LangChain bindings, built read-only (`include_mutations=False`) so the catalog reads are Kit tools and the writes stay deterministic |
+| ACK `get_lineage` via search index | **WIRED LIVE** | Resolves through DataHub's async graph index (verified returning 11 upstream assets against the live catalog); the deterministic aspect read remains the load-bearing traversal, so a cold index degrades gracefully rather than breaking the run |
 
 Redis and a secrets manager appeared in early planning; the shipped system does not need them (SSE runs without Redis, secrets live in the environment), so they are not claimed here.
 
@@ -98,7 +99,8 @@ flowchart TB
   end
 
   R <-.->|agentic tool loop, opt-in| LLM["Claude<br/>Gemini fallback via LiteLLM"]
-  T <-->|Agent Context Kit reads| DH[("DataHub OSS<br/>ML lineage + metadata")]
+  T <-->|deterministic aspect reads| DH[("DataHub OSS<br/>ML lineage + metadata")]
+  R <-->|Agent Context Kit tools<br/>get_entities, get_lineage| DH
   RC -.->|reads its own prior finding| DH
   W -->|drift_causation + proposed_fix + tag + RCA on model,<br/>incident on upstream dataset| DH
   UI["Next.js dashboard (Vercel) + Expo mobile"] <-->|SSE stream + REST| AGENT
@@ -122,6 +124,8 @@ Four parts, conceding what is commodity and claiming only the seam:
 - Identify the model owner from catalog metadata: commodity. Conceded.
 - Write a durable `drift_causation` class back onto the model entity in an open-source catalog: the defensible contribution. The write primitives exist; no tool populates them with automated drift root-cause output, and none closes the loop by reading that finding back on the next run.
 
+The closest prior art is DataHub's own open-source [Analytics Agent](https://github.com/datahub-project/analytics-agent), which already writes knowledge back into the catalog: its `/improve-context` flow turns a conversation into documentation improvements a human approves and publishes to DataHub. So "an agent improves the catalog it reads from" is not the claim here, and we do not make it. The seam we claim is narrower and sits one layer down: the written-back object is a typed, machine-readable causation record attached to an `mlModel`, produced by an automated root-cause traversal rather than by a human reading a chat, and consumed by the next agent run as a short-circuit rather than by a human reading a doc.
+
 We state the novelty as "no public prior art found," not proof of non-existence. Root cause is lineage-guided correlation plus data-quality evidence, not proven causation, and the app says so.
 
 ## How it maps to the tracks
@@ -136,7 +140,7 @@ We state the novelty as "no public prior art found," not proof of non-existence.
 ## Tech stack
 
 - **ML:** LightGBM, scikit-learn (isotonic calibration), NannyML (CBPE), SciPy / statsmodels (KS, Chi-squared, Benjamini-Hochberg FDR), pandas.
-- **Agent:** Python, LangGraph, FastAPI, sse-starlette, langchain-anthropic (Claude), LiteLLM (Gemini fallback), ACK-style catalog read tools (`get_entities`, `get_lineage`) implemented over the DataHub Python SDK, Langfuse, Postgres checkpointing.
+- **Agent:** Python, LangGraph, FastAPI, sse-starlette, langchain-anthropic (Claude), LiteLLM (Gemini fallback), the DataHub Agent Context Kit (`datahub-agent-context[langchain]`, read tools only), Langfuse, Postgres checkpointing.
 - **DataHub:** self-hosted DataHub Core (metadata auth on, least-privilege service-account PAT), GraphQL write-back, `raiseIncident`, structured properties.
 - **Web:** Next.js 16, React 19, Tailwind, React Flow, Apache ECharts, Motion, Server-Sent Events.
 - **Mobile:** Expo, React Native, react-native-sse.
@@ -188,8 +192,9 @@ Sample outputs live in `examples/`. Tests: install the dev extras first (`uv pip
 - Root cause is lineage-guided correlation plus data-quality evidence, not proven causation. The app states this on screen.
 - The primary signal is label-free performance estimation (CBPE), valid under covariate shift with calibrated probabilities but not under concept drift; the estimate is reported as directional.
 - The demo dataset is real (UCI Online Shoppers) and the injected failure is a realistic pipeline bug (an upstream job emitting a default value), not synthetic noise. The deterministic demo mode replays a recorded run so the stream is identical every time; the same code path runs live.
-- The `get_lineage` read tool reads the async graph search index, which returns 0 upstream on a freshly emitted catalog; the load-bearing traversal is the deterministic aspect read, and the agentic loop reasons around the index result.
-- The agent's read tools follow the DataHub Agent Context Kit pattern (`get_entities`, `get_lineage`, ownership) but are implemented directly over the DataHub Python SDK; the shipped path does not use the `datahub-agent-context` package or the DataHub MCP server.
+- The agent reads the catalog through the DataHub Agent Context Kit (`datahub-agent-context`, LangChain bindings, read tools only). It does not use the DataHub MCP server: the Kit exposes the same tool implementations in-process, so there is no second server to keep alive during a live demo.
+- Every catalog write is deterministic code, not a Kit tool. The Kit's mutation tools are deliberately not bound (`include_mutations=False`), because the agent's write path is a human-gated, idempotent, write-ahead-logged GraphQL layer that the LLM never touches. Incidents have no Kit or MCP tool at all, so `raiseIncident` is a hand-written GraphQL call.
+- `get_lineage` resolves through DataHub's graph search index, which is asynchronous. On a freshly emitted catalog, before the index catches up, it returns 0 upstream; the load-bearing traversal is always the deterministic aspect read, so the agent is correct either way.
 
 ## License
 
