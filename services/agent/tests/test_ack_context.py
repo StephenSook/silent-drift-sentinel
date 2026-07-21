@@ -62,3 +62,35 @@ def test_missing_tool_is_skipped_not_logged(monkeypatch):
     _tools(monkeypatch, [FakeTool("get_lineage", {"upstreams": {"total": 1}})])
     _ctx, log = datahub_io.gather_ack_context(MODEL, TABLE)
     assert [e["tool"] for e in log] == ["get_lineage"]
+
+
+class FakeGraph:
+    def __init__(self, result):
+        self._result = result
+
+    def execute_graphql(self, _q):
+        if isinstance(self._result, Exception):
+            raise self._result
+        return self._result
+
+
+def _graph(monkeypatch, result):
+    monkeypatch.setattr(datahub_io, "_graph", lambda: FakeGraph(result))
+
+
+def test_search_index_ok_when_entities_are_indexed(monkeypatch):
+    _graph(monkeypatch, {"searchAcrossEntities": {"total": 23}})
+    ok, detail = datahub_io.search_index_ok()
+    assert ok and detail == "23 entities indexed"
+
+
+def test_search_index_not_ok_when_the_query_fails(monkeypatch):
+    _graph(monkeypatch, RuntimeError("ESQueryException: Search query failed"))
+    ok, detail = datahub_io.search_index_ok()
+    assert not ok and "ESQueryException" in detail
+
+
+def test_search_index_not_ok_when_the_index_is_empty(monkeypatch):
+    _graph(monkeypatch, {"searchAcrossEntities": {"total": 0}})
+    ok, detail = datahub_io.search_index_ok()
+    assert not ok and detail == "search index is empty"

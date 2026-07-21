@@ -37,8 +37,18 @@ jobs:
           if [ "$hcode" != "200" ] || ! printf '%s' "$hbody" | grep -q ok; then
             echo "::error::agent-health is DOWN (HTTP $hcode, body: $hbody)"; fail=1
           fi
+          # Data plane, not just liveness. DataHub's search index is a separate service:
+          # it died once and stayed dead for twelve days while every check above stayed
+          # green, because deterministic aspect reads do not touch it.
+          ccode=$(ping "https://agent.16-59-185-192.nip.io/api/catalog-health")
+          cbody=$(cat /tmp/b 2>/dev/null)
+          echo "catalog-health: HTTP $ccode $cbody"
+          if [ "$ccode" != "200" ] || ! printf '%s' "$cbody" | grep -q '"search_ok":[[:space:]]*true'; then
+            echo "::error::DataHub search index is DOWN (HTTP $ccode, body: $cbody)"; fail=1
+          fi
           if [ "$fail" -ne 0 ]; then
             echo "One or more Silent-Drift Sentinel surfaces are DOWN. SSH the AWS VM, restart the sentinel-agent service and the DataHub docker containers, then confirm /health returns ok."
+            echo "If catalog-health failed: docker ps | grep opensearch, then recreate it from ~/.datahub/quickstart with COMPOSE_PROFILES=quickstart docker compose -p datahub --env-file .local-secrets.env up -d --no-deps opensearch"
             exit 1
           fi
           echo "ALL GREEN"

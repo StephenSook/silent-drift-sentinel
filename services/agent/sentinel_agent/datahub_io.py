@@ -20,6 +20,25 @@ def _graph() -> DataHubGraph:
     return DataHubGraph(DataHubGraphConfig(server=config.GMS_URL, token=config.GMS_TOKEN))
 
 
+_SEARCH_PROBE = """{ searchAcrossEntities(input: {query: "*", start: 0, count: 1}) { total } }"""
+
+
+def search_index_ok() -> tuple[bool, str]:
+    """Is DataHub's search index answering? Deterministic aspect reads keep working when
+    it is not, so nothing else in this service notices an index outage. Never raises:
+    the caller is a watchdog probe and wants the failure as a value."""
+    try:
+        total = (_graph().execute_graphql(_SEARCH_PROBE) or {}) \
+            .get("searchAcrossEntities", {}).get("total")
+    except Exception as e:  # noqa: BLE001
+        return False, f"{type(e).__name__}: {str(e).strip().splitlines()[0][:160]}"
+    if not isinstance(total, int):
+        return False, "search returned no total"
+    if total <= 0:
+        return False, "search index is empty"
+    return True, f"{total} entities indexed"
+
+
 def traverse_lineage(model_urn: str, drifted_feature: str) -> dict[str, Any]:
     """Walk model -> features -> the drifted feature's source table -> owners.
     Deterministic aspect reads (immediate, no dependence on the async graph index)."""

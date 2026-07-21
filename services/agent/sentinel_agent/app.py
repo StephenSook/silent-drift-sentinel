@@ -112,6 +112,17 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+@app.get("/api/catalog-health")
+def catalog_health() -> dict:
+    """Data-plane probe for the uptime watchdog. `/health` only proves this process is
+    running: DataHub's search index died once and stayed dead for twelve days while every
+    health endpoint reported ok, because the index is a separate service the agent only
+    touches on search-backed reads. This exercises one, so an index outage fails the
+    watchdog instead of hiding until a judge hits it. Returns no catalog contents."""
+    ok, detail = datahub_io.search_index_ok()
+    return {"search_ok": ok, "detail": detail}
+
+
 @app.get("/api/signal")
 def signal(scenario: str = "harmful") -> dict:
     return _load_signal(scenario)
